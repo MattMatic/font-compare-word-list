@@ -1,0 +1,321 @@
+<html>
+
+<head>
+<meta charset="utf-8">
+<!--
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Gulzar|Noto+Nastaliq+Urdu">
+-->
+<style>
+  body {
+    font-family: "Calibri";
+    background-color: #aacccc;
+  }
+.test_1 {
+  font-family: "Test_Font_1";
+  font-kerning: normal;
+  font-size: 200%;
+  color: #000080;
+  text-align: center;
+}
+
+.test_2 {
+  font-family: "Test_Font_2";
+  font-kerning: normal;
+  font-size: 200%;
+  color: #ee6600;
+  text-align: center;
+}
+
+.overlap {
+  text-align: center;
+  line-height: 0px;
+}
+
+input[type="text"] {
+  font-size: 100%;
+}
+table, th, td {
+  border: 2px solid #448888;
+  border-collapse: collapse;
+  padding: 8px;
+}
+td {
+  align: 'left';
+}
+.wordlist, input[type="file"] {
+  background-color: #8ebf42;
+}
+</style>
+
+<script type="text/javascript" src="fontname.min.js"></script>
+<script>
+//------------------------------
+// Drag and drop utilities
+//------------------------------
+function cancel(e) {e.stopPropagation();e.preventDefault();}
+function patchDragDrop(ele, foo) {
+  //const ele = document.getElementById(id);
+  ele.addEventListener('dragover', function(e) {
+    cancel(e);
+    ele.style.backgroundColor = 'yellow';
+    }, false);
+  ele.addEventListener('dragleave', function(e) {
+    cancel(e);
+    ele.style.backgroundColor = null;
+    }, false);
+  ele.addEventListener('drop', function(e) {
+    cancel(e);
+    const file = e.dataTransfer.files[0];
+    ele.style.backgroundColor = null;
+    foo(file, ele);
+  });
+}
+document.addEventListener('dragover', cancel, false);
+document.addEventListener('dragleave', cancel, false);
+document.addEventListener('drop', cancel, false);
+
+
+//------------------------------
+// Document/CSS Font Utilities
+//------------------------------
+function changeFontAscentDescent(name, asc, desc) {
+  document.fonts.forEach(
+    (v) => {
+      if (v.family == name) {
+        v.ascentOverride  = asc;
+        v.descentOverride = desc;
+      }
+    }
+  );
+}
+
+function deleteFontByName(name) {
+  document.fonts.forEach(
+    (v) => {
+      if (v.family == name) {
+        document.fonts.delete(v);
+      }
+    }
+  );
+}
+
+//------------------------------
+// Build table
+//------------------------------
+start_index = 1
+per_block = 100
+line = 1
+function wordHTML(txt,fnt) {
+  //return '<div class="'+fnt+'" align="center"><p>'+txt+'</p></div>'
+  return '<div class="'+fnt+'"><p>'+txt+'</p></div>'
+}
+function addUrdu(line, txt) {
+  if (txt == '') return;
+  var table = document.getElementById('word_list');
+  var row = table.insertRow();
+  var idx=1;
+  row.insertCell(0).innerHTML = '<div align="center">'+(line+1)+'</div>';
+  row.insertCell(idx++).innerHTML = wordHTML(txt, "test_1");
+  row.insertCell(idx++).innerHTML = wordHTML(txt, "test_2");
+  row.insertCell(idx++).innerHTML = 
+      //'<p style="line-height: 0px; " align="center">'
+      '<p class="overlap">'
+    + '<span class="test_2" style="color: #ff6600;">' + txt + '</span><br>'
+    + '<span class="test_1">' + txt + '</span></p>'
+}
+function addrow() {
+  var field = document.getElementById("text");
+  var txt = field.value;
+  addUrdu(line, txt)
+  line++;
+  field.value = '';
+}
+function dokey(ele) {
+  ele.preventDefault();
+  if (ele.keyCode == 13) {
+    addrow();
+  }
+  return false;
+}
+function updateListByIndex(idx) {
+  var table = document.getElementById('word_list')
+
+  var s = table.rows.length;
+  while (s > 1) {
+    s--;
+    table.deleteRow(s);
+  }
+  var n =  per_block;
+  for (i=(idx-1); i < (idx-1+n); i++) {
+    if (!mya[i]) break;
+    addUrdu(i, mya[i]);
+  }
+  document.getElementById('start').value = String(idx);
+}
+function getStart() {
+  var i = Number(document.getElementById('start').value);
+  if (i < 1) {
+    i = 1;
+  }
+  if (i > mya.length) {
+    i = mya.length-1;
+  }
+  return i;
+}
+function setStart(idx) {
+  document.getElementById('start').value = String(idx);
+}
+function updateListByField() {
+  start_index = getStart();
+  setStart(start_index);
+  updateListByIndex(start_index);
+}
+function updateListNext() {
+  start_index = getStart() + per_block;
+  if (start_index > mya.length) start_index = mya.length - 2;
+  if (start_index < 1) start_index = 1;
+  updateListByIndex(start_index);
+}
+function updateListPrev() {
+  start_index = getStart() - per_block;
+  if (start_index < 1) start_index = 1;
+  updateListByIndex(start_index);
+}
+
+
+function updateCssStyle(name, styleid, value) {
+  const rules = document.styleSheets[0].cssRules;
+  for (var i=0; i<rules.length; i++) {
+    if (rules[i].selectorText == name) {
+      rules[i].style[styleid] = value;
+      break;
+    }
+  }
+}
+function updateAlign() {
+  const alignRadios = document.getElementsByName('alignment');
+  var text_align = 'center';
+  for (var i=0; i<alignRadios.length; i++) {
+    if (alignRadios[i].checked) {
+      text_align = alignRadios[i].value;
+      break;
+    }
+  }
+  updateCssStyle('.test_1', 'text-align', text_align);
+  updateCssStyle('.test_2', 'text-align', text_align);
+  updateCssStyle('.overlap', 'text-align', text_align);
+}
+
+</script>
+</head>
+
+<body>
+
+<h1>
+  Compare Font Word List Tool
+</h1>
+
+<label for='start'>Start:</label><input type='text' id='start' placeholder='Start' value='1'/>
+<button onclick='updateListByField();'>Update</button>
+<button onclick='updateListPrev();' accesskey='2'>Prev (Alt-2)</button>
+<button onclick='updateListNext();' accesskey='3'>Next (Alt-3)</button>
+<span id='wordcount'></span>
+</br>
+<span>
+  <input type='radio' name='alignment' value='left' onclick="updateAlign();">
+    <label for='left'>Left</label>
+  <input type='radio' name='alignment' value='center' onclick="updateAlign();" checked>
+    <label for='center'>Center</label>
+  <input type='radio' name='alignment' value='right' onclick="updateAlign();">
+    <label for='right'>Right</label>
+</span>
+
+<table border=2 cellspacing="8px" width='100%' id='word_list'>
+  <tr>
+    <th width='7%'>#</th>
+    <th width='31%' id='fontOneInfo'>Drag-and-Drop Font 1</th>
+    <th width='31%' id='fontTwoInfo'>Drag-and-Drop Font 2</th>
+    <th width='31%'>Overlap</th>
+  </tr>
+</table>
+
+</p>
+<table width="100%" border=1>
+  <tr>
+    <th width="15%">Word List</th>
+    <td id='WordsDragDrop'>Drag-and-Drop Word .txt File Here</td>
+  </tr>
+</table>
+</p>
+
+<script>
+
+//---------------------------Fill in the text as separate lines------------------
+const txt = '';
+mya = txt.split(/\r?\n+/g)
+updateListByIndex(1)
+//===============================================================================
+
+//------------------------------
+// Drag and drop functions
+//------------------------------
+function handleWordsDrop(file) {
+  if (!file) return;
+  const fileName = file.name.toLowerCase();
+  if (!fileName.endsWith('.txt')) return;
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var txt = e.target.result;
+    mya = txt.split(/\r?\n+/g)
+    updateListByIndex(1);
+    var wlc = document.getElementById('wordcount');
+    wlc.innerHTML = 'Count:'+mya.length;
+  }
+  reader.readAsText(file);
+}
+
+function handleFontXDrop(file, fontname, id) {
+  if (!file) return;
+  const fileName = file.name.toLowerCase();
+  if (!fileName.endsWith('.ttf') && !fileName.endsWith('.otf')) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    const fontFace = new FontFace(fontname, reader.result);
+    const fontInfo = FontName.parse(reader.result);
+    const fontName = fontInfo[0];
+    id.innerHTML = fontName.fullName + '</b></br><font size="-1">' + fontName.version + "</font>";
+    fontFace.load().then(
+      () => {
+        deleteFontByName(fontname);
+        document.fonts.add(fontFace);
+        console.log('loaded '+file.name);
+        changeFontAscentDescent(fontname, '200%', '200%');
+      },
+      (err) => {
+        console.error(err);
+      }
+      );
+  }
+  reader.readAsArrayBuffer(file);
+}
+
+function handleFontOneDrop(file) {
+  handleFontXDrop(file, 'Test_Font_1', fontOneInfo);
+}
+
+function handleFontTwoDrop(file) {
+  handleFontXDrop(file, 'Test_Font_2', fontTwoInfo);
+}
+
+patchDragDrop(WordsDragDrop, handleWordsDrop);
+patchDragDrop(fontOneInfo, handleFontOneDrop);
+patchDragDrop(fontTwoInfo, handleFontTwoDrop);
+
+</script>
+
+<button onclick='window && window.scroll(0,0)'>TOP</button>
+<button onclick='updateListNext(); window && window.scroll(0,0)'>Next</button>
+<p>2024-10-03</p>
+</body>
+</html>
