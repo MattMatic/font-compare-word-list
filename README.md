@@ -6,6 +6,9 @@ Shows each word in a cell, and shows the two fonts overlaid.
 
 For more detailed view: https://github.com/MattMatic/hbfontcompare
 
+## Live Demo
+https://mattmatic.github.io/font-compare-word-list/
+
 ## Usage
 - Drag a .txt file onto the "Word List" drag-and-drop site
 	- File should be one word per line
