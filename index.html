@@ -73,6 +73,12 @@ function patchDragDrop(ele, foo) {
 document.addEventListener('dragover', cancel, false);
 document.addEventListener('dragleave', cancel, false);
 document.addEventListener('drop', cancel, false);
+window.addEventListener('beforeunload', function(e) {
+  if (!checkListChanged) return undefined;
+  var confirmMessage = 'CheckList is not yet saved. If you leave before saving, changes will be lost!';
+  (e || window.event).returnValue = confirmMessage;
+  return confirmMessage;
+});
 
 
 //------------------------------
