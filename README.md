@@ -34,7 +34,6 @@ To remove duplicates from a word list:
 
 - Drag a word list .txt file to the Word List
 - Drag the same word list .txt file to the CheckList
-- Click "Invert"
 - Click "Delete Unchecked"
 
 
