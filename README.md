@@ -17,7 +17,26 @@ https://mattmatic.github.io/font-compare-word-list/
 - Use the Prev / Next buttons to scroll through the word list
 	- Prev = Alt-2
 	- Next = Alt-3
-- Type in a "Start" position and click "Update" to jump to a location
+- Type in a "Start" position and click "Go" to jump to a location
+
+## CheckList Usage
+After loading the word list...
+
+- Drag a .txt file of words to the "CheckList" drag-and-drop site
+	- For each word in the checklist file, the first matching word will be checked
+	- Note: any checks already in place will be left
+- Click "Download" to save a file `CheckList.YYYYMMDD_HHMMSS.txt` file with the words
+- Click "Invert" to toggle all checkboxes
+- Click "Delete Unchecked" to permanently remove words
+
+### Sequences
+To remove duplicates from a word list:
+
+- Drag a word list .txt file to the Word List
+- Drag the same word list .txt file to the CheckList
+- Click "Invert"
+- Click "Delete Unchecked"
+
 
 ## Links
 - https://github.com/danbovey/fontname

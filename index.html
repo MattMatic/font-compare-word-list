@@ -109,15 +109,31 @@ function wordHTML(txt,fnt) {
   //return '<div class="'+fnt+'" align="center"><p>'+txt+'</p></div>'
   return '<div class="'+fnt+'"><p>'+txt+'</p></div>'
 }
+
+function MarkUpdate(e) {
+  var n = e.name;
+  n = parseInt(n.substring(4)) - 1;
+  mym[n] = e.checked;
+  checkListChanged = true;
+}
+
+function BuildMarkHtml(n) {
+  var txt = '<input type="checkbox" onclick="MarkUpdate(this);" name="mark'+(n+1)+'"';
+  if (mym[n]) txt = txt + ' checked';
+  txt = txt + '>';
+  return txt;
+}
+
 function addUrdu(line, txt) {
   if (txt == '') return;
   var table = document.getElementById('word_list');
   var row = table.insertRow();
   var idx=1;
-  row.insertCell(0).innerHTML = '<div align="center">'+(line+1)+'</div>';
+  row.insertCell(0).innerHTML = '<div align="center">'+(line+1)+
+      BuildMarkHtml(line)+'</div>';
   row.insertCell(idx++).innerHTML = wordHTML(txt, "test_1");
   row.insertCell(idx++).innerHTML = wordHTML(txt, "test_2");
-  row.insertCell(idx++).innerHTML = 
+  row.insertCell(idx++).innerHTML =
       //'<p style="line-height: 0px; " align="center">'
       '<p class="overlap">'
     + '<span class="test_2" style="color: #ff6600;">' + txt + '</span><br>'
@@ -216,7 +232,7 @@ function updateAlign() {
 </h1>
 
 <label for='start'>Start:</label><input type='text' id='start' placeholder='Start' value='1'/>
-<button onclick='updateListByField();'>Update</button>
+<button onclick='updateListByField();'>Go</button>
 <button onclick='updateListPrev();' accesskey='2'>Prev (Alt-2)</button>
 <button onclick='updateListNext();' accesskey='3'>Next (Alt-3)</button>
 <span id='wordcount'></span>
@@ -240,21 +256,111 @@ function updateAlign() {
 </table>
 
 </p>
+
+<p>
+<button onclick='window && window.scroll(0,0)'>TOP</button>
+<button onclick='updateListNext(); window && window.scroll(0,0)'>Next</button>
+</p>
 <table width="100%" border=1>
   <tr>
-    <th width="15%">Word List</th>
-    <td id='WordsDragDrop'>Drag-and-Drop Word .txt File Here</td>
+    <th width="20%">CheckList</th>
+    <th>Word List</th>
+  </tr>
+  <tr>
+    <td id='CheckDragDrop' align='center'>Drag-and-drop CheckList .txt here</br>
+      <button onclick='DownloadCheckList();'>Download</button> &bull;
+      <button onclick='ClearCheckListUser();'>Clear All</button> &bull;
+      <button onclick='InvertCheckList();'>Invert</button>
+    </td>
+    <td id='WordsDragDrop' align='center'>Drag-and-drop Word List .txt file here</br>
+      <button onclick='RemoveUnchecked();'>Delete Unchecked</button>
+    </td>
   </tr>
 </table>
 </p>
 
 <script>
 
+function ClearCheckList() {
+  mym = []
+  checkListChanged = false;
+}
+
+function ClearCheckListUser() {
+  if (checkListChanged) {
+    if (!window.confirm('Check List has changed! Clear all?')) return;
+  }
+  ClearCheckList();
+  updateListByField();
+}
+
+function InvertCheckList() {
+  var i = 0;
+  while (true) {
+    if (!mya[i]) break;
+    if (mym[i])
+      mym[i] = false;
+    else
+      mym[i] = true;
+    i++;
+  }
+  checkListChanged = true;
+  updateListByField();
+}
+
+function RemoveUnchecked() {
+  if (!window.confirm('Delete all unchecked words? (Cannot be undone!)')) return;
+  var i = 0;
+  while (true) {
+    if (!mya[i]) break;
+    if (!mym[i]) {
+      mya.splice(i, 1);
+      mym.splice(i, 1);
+    } else {
+      i++;
+    }
+  }
+  UpdateWordCount();
+  updateListByIndex(1);
+}
+
+function DateTimeForFilename() {
+  //  012345678901234567890123
+  // '2024-11-07T14:55:03.791Z'
+  var d = new Date().toJSON();
+  return d.slice(0,4)+d.slice(5,7)+d.slice(8,10)+'_'+
+         d.slice(11,13)+d.slice(14,16)+d.slice(17,19);
+}
+
+function DownloadCheckList() {
+  var txt = '';
+  var i = 0;
+  while (true) {
+    if (!mya[i]) break;
+    if (mym[i]) txt = txt + mya[i]+'\n';
+    i++;
+  }
+  var bb = new Blob([txt], {type: 'text/plain;charset=utf-8'});
+  var a = document.createElement('a');
+  a.download = 'CheckList.'+DateTimeForFilename()+'.txt';
+  a.href = window.URL.createObjectURL(bb);
+  a.target='_blank';
+  a.click();
+  //document.body.removeChild(a);
+}
+
 //---------------------------Fill in the text as separate lines------------------
 const txt = '';
 mya = txt.split(/\r?\n+/g)
+ClearCheckList();
 updateListByIndex(1)
 //===============================================================================
+
+
+function UpdateWordCount() {
+  var wlc = document.getElementById('wordcount');
+  wlc.innerHTML = 'Count:'+mya.length;
+}
 
 //------------------------------
 // Drag and drop functions
@@ -264,13 +370,42 @@ function handleWordsDrop(file) {
   const fileName = file.name.toLowerCase();
   if (!fileName.endsWith('.txt')) return;
 
+  if (checkListChanged) {
+    if (!window.confirm('Check List has changed! Continue?')) return;
+  }
+
   var reader = new FileReader();
   reader.onload = function(e) {
     var txt = e.target.result;
-    mya = txt.split(/\r?\n+/g)
+    mya = txt.split(/\r?\n+/g);
+    ClearCheckList();
     updateListByIndex(1);
-    var wlc = document.getElementById('wordcount');
-    wlc.innerHTML = 'Count:'+mya.length;
+    UpdateWordCount();
+  }
+  reader.readAsText(file);
+}
+
+function handleCheckDrop(file) {
+  if (!file) return;
+  const fileName = file.name.toLowerCase();
+  if (!fileName.endsWith('.txt')) return;
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var txt = e.target.result;
+    var chk = txt.split(/\r?\n+/g);
+    var i = 0;
+    while (true) {
+      var w = chk[i];
+      if (!w) break;
+      var mi = mya.indexOf(w);
+      if (mi >= 0) {
+        mym[mi] = true;
+      }
+      i++;
+    }
+    checkListChanged = true;
+    updateListByField();
   }
   reader.readAsText(file);
 }
@@ -309,13 +444,12 @@ function handleFontTwoDrop(file) {
 }
 
 patchDragDrop(WordsDragDrop, handleWordsDrop);
+patchDragDrop(CheckDragDrop, handleCheckDrop);
 patchDragDrop(fontOneInfo, handleFontOneDrop);
 patchDragDrop(fontTwoInfo, handleFontTwoDrop);
 
 </script>
 
-<button onclick='window && window.scroll(0,0)'>TOP</button>
-<button onclick='updateListNext(); window && window.scroll(0,0)'>Next</button>
-<p>2024-10-03</p>
+<p>2024-11-07</p>
 </body>
 </html>
