@@ -326,6 +326,7 @@ function RemoveUnchecked() {
       i++;
     }
   }
+  if (!wordlist_filename.endsWith('(edited)')) wordlist_filename = wordlist_filename + ' (edited)';
   UpdateWordCount();
   updateListByIndex(1);
 }
@@ -356,8 +357,9 @@ function DownloadCheckList() {
 }
 
 //---------------------------Fill in the text as separate lines------------------
-const txt = '';
-mya = txt.split(/\r?\n+/g)
+//const txt = '';
+//mya = txt.split(/\r?\n+/g)
+mya = []
 ClearCheckList();
 updateListByIndex(1)
 //===============================================================================
@@ -365,7 +367,9 @@ updateListByIndex(1)
 
 function UpdateWordCount() {
   var wlc = document.getElementById('wordcount');
-  wlc.innerHTML = 'Count:'+mya.length;
+  var txt = 'Count:'+mya.length;
+  if (wordlist_filename) txt = txt + ' '+wordlist_filename;
+  wlc.innerHTML = txt;
 }
 
 //------------------------------
@@ -380,6 +384,7 @@ function handleWordsDrop(file) {
     if (!window.confirm('Check List has changed! Continue?')) return;
   }
 
+  wordlist_filename = '"'+fileName+'"';
   var reader = new FileReader();
   reader.onload = function(e) {
     var txt = e.target.result;
