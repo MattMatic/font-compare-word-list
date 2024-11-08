@@ -130,8 +130,8 @@ function BuildMarkHtml(n) {
   return txt;
 }
 
-function addUrdu(line, txt) {
-  if (txt == '') return;
+function addEntry(line, txt) {
+  //if (txt == '') return;
   var table = document.getElementById('word_list');
   var row = table.insertRow();
   var idx=1;
@@ -169,8 +169,8 @@ function updateListByIndex(idx) {
   }
   var n =  per_block;
   for (i=(idx-1); i < (idx-1+n); i++) {
-    if (!mya[i]) break;
-    addUrdu(i, mya[i]);
+    if (mya[i] === undefined) break;
+    addEntry(i, mya[i]);
   }
   document.getElementById('start').value = String(idx);
 }
@@ -303,7 +303,7 @@ function ClearCheckListUser() {
 function InvertCheckList() {
   var i = 0;
   while (true) {
-    if (!mya[i]) break;
+    if (mya[i] === undefined) break;
     if (mym[i])
       mym[i] = false;
     else
@@ -318,7 +318,7 @@ function RemoveUnchecked() {
   if (!window.confirm('Delete all unchecked words? (Cannot be undone!)')) return;
   var i = 0;
   while (true) {
-    if (!mya[i]) break;
+    if (mya[i] === undefined) break;
     if (!mym[i]) {
       mya.splice(i, 1);
       mym.splice(i, 1);
@@ -342,7 +342,7 @@ function DownloadCheckList() {
   var txt = '';
   var i = 0;
   while (true) {
-    if (!mya[i]) break;
+    if (mya[i] === undefined) break;
     if (mym[i]) txt = txt + mya[i]+'\n';
     i++;
   }
@@ -456,6 +456,6 @@ patchDragDrop(fontTwoInfo, handleFontTwoDrop);
 
 </script>
 
-<p>2024-11-07</p>
+<p>2024-11-08</p>
 </body>
 </html>
