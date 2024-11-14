@@ -26,6 +26,11 @@
   text-align: center;
 }
 
+.HBC {
+  font-family: "Consolas";
+  text-align: center;
+}
+
 .overlap {
   text-align: center;
   line-height: 0px;
@@ -47,8 +52,23 @@ td {
 }
 </style>
 
+<script type="text/javascript" src="hbjs.js"></script> <!-- Wrapper, can be used without -->
 <script type="text/javascript" src="fontname.min.js"></script>
 <script>
+
+// We could use instantiateStreaming but it's not supported in Safari yet
+// https://bugs.webkit.org/show_bug.cgi?id=173105
+var wasmUrl = 'hb.wasm';
+if (window.origin == 'null') wasmUrl = 'https://mattmatic.github.io/hbfontcompare/hb.wasm';
+
+fetch(wasmUrl).then(function (x) {
+  return x.arrayBuffer();
+}).then(function (wasm) {
+  return WebAssembly.instantiate(wasm);
+}).then(function (result) {
+  window.hb = hbjs(result.instance);
+});
+
 //------------------------------
 // Drag and drop utilities
 //------------------------------
@@ -130,13 +150,39 @@ function BuildMarkHtml(n) {
   return txt;
 }
 
+var hb_icon_identical = '&#x2705;';
+var hb_icon_length    = '&#x1F4A5;';  //collision
+var hb_icon_advance   = '&#x1F525;';  //fire
+var hb_icon_offset    = '&#x1F53A;';  //up red triangle
+var hb_icon_cluster   = '&#x1F4A0;';  //diamond (blue)
+var hb_icon_gid       = '';
+
+function diffFieldToText(diff) {
+  var res = '';
+  if (diff < 0) return '';
+  if (diff == 0) return hb_icon_identical;
+  if (0 != (diff & 128)) res = res + hb_icon_length + "</br>";
+  if (0 != (diff & 8))   res = res + hb_icon_advance + "</br>";
+  if (0 != (diff & 4))   res = res + hb_icon_offset + "</br>";
+  if (0 != (diff & 2))   res = res + hb_icon_cluster + "</br>";
+  if (0 != (diff & 1))   res = res + hb_icon_gid;// + "</br>";
+  return res;
+}
+
 function addEntry(line, txt) {
   //if (txt == '') return;
   var table = document.getElementById('word_list');
   var row = table.insertRow();
   var idx=1;
+
+  hbf1.shape(txt);
+  hbf2.shape(txt);
+  var diff = hbf1.compare(hbf2);
+
   row.insertCell(0).innerHTML = '<div align="center">'+(line+1)+
       BuildMarkHtml(line)+'</div>';
+  row.insertCell(idx++).innerHTML = '<div class="HBC">'+
+      diffFieldToText(diff)+'</div>';
   row.insertCell(idx++).innerHTML = wordHTML(txt, "test_1");
   row.insertCell(idx++).innerHTML = wordHTML(txt, "test_2");
   row.insertCell(idx++).innerHTML =
@@ -160,8 +206,10 @@ function dokey(ele) {
   return false;
 }
 function updateListByIndex(idx) {
-  var table = document.getElementById('word_list')
+  hbf1.setScriptLang(HBScript.value, HBLang.value);
+  hbf2.setScriptLang(HBScript.value, HBLang.value);
 
+  var table = document.getElementById('word_list')
   var s = table.rows.length;
   while (s > 1) {
     s--;
@@ -189,6 +237,7 @@ function setStart(idx) {
 }
 function updateListByField() {
   start_index = getStart();
+  if (start_index <= 1) start_index = 1;
   setStart(start_index);
   updateListByIndex(start_index);
 }
@@ -255,6 +304,10 @@ function updateAlign() {
 <table border=2 cellspacing="8px" width='100%' id='word_list'>
   <tr>
     <th width='7%'>#</th>
+    <th width='6%'><a href='javascript:void(0)' onclick='toggleHBIcons();'>Diff</a>
+      <div id='HBIcons' hidden>
+      </div>
+    </th>
     <th width='31%' id='fontOneInfo'>Drag-and-Drop Font 1</th>
     <th width='31%' id='fontTwoInfo'>Drag-and-Drop Font 2</th>
     <th width='31%'>Overlap</th>
@@ -264,7 +317,7 @@ function updateAlign() {
 </p>
 
 <p>
-<button onclick='window && window.scroll(0,0)'>TOP</button>
+<button onclick='updateListByField(); window && window.scroll(0,0)'>TOP</button>
 <button onclick='updateListNext(); window && window.scroll(0,0)'>Next</button>
 </p>
 <table width="100%" border=1>
@@ -276,16 +329,159 @@ function updateAlign() {
     <td id='CheckDragDrop' align='center'>Drag-and-drop CheckList .txt here</br>
       <button onclick='DownloadCheckList();'>Download</button> &bull;
       <button onclick='ClearCheckListUser();'>Clear All</button> &bull;
-      <button onclick='InvertCheckList();'>Invert</button>
+      <button onclick='InvertCheckList();'>Invert</button> &bull;
+      </br>
+      <button onclick='CheckSimilar();'>Check Similar</button>
     </td>
     <td id='WordsDragDrop' align='center'>Drag-and-drop Word List .txt file here</br>
-      <button onclick='RemoveUnchecked();'>Delete Unchecked</button>
+      <button onclick='RemoveUnchecked();'>Delete Unchecked</button></br>
+      <a href='javascript:void(0)' onclick='togglePropertiesVisibility(); return false;' id='hrefLanguageProperties'>
+        Show Lang/Script
+      </a>
+      <div id='languageProperties' hidden>
+      <table border=1>
+        <tr><th>HTML Lang:</th><td><input type='text' id='HTMLLang' oninput='updateLanguage();'/></td></tr>
+        <tr><th>HarfBuzz Script:</th><td><input type='text' id='HBScript' oninput='updateLanguage();'/></td></tr>
+        <tr><th>HarfBuzz Lang:</th><td><input type='text' id='HBLang' oninput='updateLanguage();'/></td></tr>
+      </table>
+      </div>
+      <div id='statusUpdate'>-</div>
     </td>
   </tr>
 </table>
 </p>
 
 <script>
+
+class hbFont {
+  constructor() {
+    this.script = 'latn';
+    this.lang   = '';
+    this.features = '';
+    this.results = {};
+    this.results.json = null;
+  }
+  destroy() {
+    this.freeFontBlob();
+  }
+  freeFontBlob() {
+    this.freeFont();
+    this.fileDescription = null;
+    delete(this.fontBlob);
+  }
+  freeFont() {
+    this.results = {};
+    if (this.font) { this.font.destroy(); delete(this.font); }
+    if (this.face) { this.face.destroy(); delete(this.face); }
+    if (this.blob) { this.blob.destroy(); delete(this.blob); }
+  }
+  setFontBlob(fb) {
+    this.freeFont();
+    this.fontBlob = fb;
+    if (fb) {
+      const fontName = FontName.parse(fb)[0];
+      console.log(fontName);
+      this.fileDescription = fontName.fullName + '</br>' + fontName.version;
+    } else {
+      this.fileDescription = '';
+    }
+    if (!fb) return;
+    this.blob = hb.createBlob(this.fontBlob);
+    this.face = hb.createFace(this.blob, 0);
+    this.font = hb.createFont(this.face);
+  }
+  setScriptLang(script, lang) {
+    this.script = script;
+    this.lang = lang;
+  }
+  shape(txt) {
+    if (!this.fontBlob) return;
+    var buffer = hb.createBuffer();
+    buffer.addText(txt);
+    buffer.guessSegmentProperties();
+    if (this.script && (this.script.length > 0))
+      buffer.setScript(this.script || 'latn');
+    if (this.lang && (this.lang.length > 0))
+      buffer.setLanguage(this.lang);
+    hb.shape(this.font, buffer, this.features);
+    this.results.json = buffer.json(this.font);
+    buffer.destroy();
+  }
+  compare(hb2) {
+    // Returns bit field:
+    // 1 = GID different
+    // 2 = Cluster different
+    // 4 = Offset different
+    // 8 = Advance different (e.g. kerning)
+    // 128 = different length
+    if ( (this.results === null) ||
+         (this.results.json === null) ||
+         (hb2.results === null) ||
+         (hb2.results.json === null)
+       )
+    {
+      return -1;
+    }
+    var idx = 0;
+    var res = 0;
+    while (true) {
+      if (idx >= this.results.json.length) {
+        if (idx < hb2.results.json.length) res |= 128;
+        break;
+      }
+      if (idx >= hb2.results.json.length) {
+        res |= 128;
+        break;
+      }
+      const g1 = this.results.json[idx];
+      const g2 = hb2.results.json[idx];
+      if (g1 === null) {
+        if (g1 !== null) res |= 128;
+        break;
+      }
+      if (g2 === null) {
+        res |= 128;
+        break;
+      }
+      if (g1.g  !== g2.g)  res |= 1;
+      if (g1.cl !== g2.cl) res |= 2;
+      if (g1.dx !== g2.dx) res |= 4;
+      if (g1.dy !== g2.dy) res |= 4;
+      if (g1.ax !== g2.ax) res |= 8;
+      if (g1.ay !== g2.ay) res |= 8;
+      idx++;
+    }
+    return res;
+  }
+}
+
+var hbf1 = new hbFont;
+var hbf2 = new hbFont;
+
+// Show/Hide the language & script fields
+function togglePropertiesVisibility() {
+  languageProperties.hidden = !languageProperties.hidden;
+  let txt = hrefLanguageProperties.text;
+  if (languageProperties.hidden)
+    hrefLanguageProperties.text = txt.replace('Hide', 'Show');
+  else
+    hrefLanguageProperties.text = txt.replace('Show', 'Hide');
+}
+
+function toggleHBIcons() {
+  HBIcons.innerHTML = '</br>'+
+    hb_icon_identical + 'exact</br>'+
+    hb_icon_length + 'len</br>'+
+    hb_icon_advance + 'adv</br>'+
+    hb_icon_offset  + 'ofs</br>'+
+    hb_icon_cluster + 'clu</br>';
+  HBIcons.hidden = !HBIcons.hidden;
+}
+
+// Update the document language tag, and the HarfBuzz values
+function updateLanguage() {
+  document.documentElement.setAttribute('lang', HTMLLang.value);
+}
 
 function ClearCheckList() {
   mym = []
@@ -314,21 +510,133 @@ function InvertCheckList() {
   updateListByField();
 }
 
+
+// See: https://elplatt.com/javascript-updating-dom-during-long-running-computation
+function doUntil(loop, stopCondition, yieldCondition) {
+    // Wrap function in promise so it can run asynchronously
+    return new Promise((resolve, reject) => {
+
+    // Build outerLoop function to pass to setTimeout
+    let outerLoop = function () {
+      while (true) {
+        // Execute a single inner loop iteration
+        loop();
+
+        if (stopCondition()) {
+            // Resolve promise, exit outer loop,
+                        // and do not re-enter
+            resolve();
+            break;
+        } else if (yieldCondition()) {
+            // Exit outer loop and queue up next
+                        // outer loop iteration for next event loop cycle
+            setTimeout(outerLoop, 0);
+            break;
+        }
+        // Continue to next inner loop iteration
+        // without yielding
+      }
+    };
+
+    // Start the first iteration of outer loop,
+    // unless the stop condition is met
+    if (!stopCondition()) {
+        setTimeout(outerLoop, 0);
+    }
+  });
+}
+function CheckSimilar_blocking() {
+  hbf1.setScriptLang(HBScript.value, HBLang.value);
+  hbf2.setScriptLang(HBScript.value, HBLang.value);
+  var i = 0;
+  var ms_s = +new Date();
+  while (true) {
+    if (mya[i] === undefined) break;
+    hbf1.shape(mya[i]);
+    hbf2.shape(mya[i]);
+    var diff = hbf1.compare(hbf2);
+    if ((diff == 1) || (diff == 0)) {
+      mym[i] = true;
+    }
+    i++;
+  }
+  var ms_e = +new Date();
+  console.log('CheckSimilar:', ms_s, ms_e, ms_e-ms_s);
+  checkListChanged = true;
+  UpdateWordCount();
+  updateListByIndex(1);
+  window.scroll(0,0);
+}
+
+function updateStatusMessage(i, total) {
+  if (i <= 0)
+    statusUpdate.innerHTML = '-';
+  else
+    statusUpdate.innerHTML = '<div><font color="red">'+i + '/'+ total+'</font></div>';
+}
+
+function CheckSimilar() {
+  let i = 0;
+  const total = mya.length;
+
+  if (total > 5000) {
+    if (!window.confirm('This will take a LONG time. Continue?')) return;
+  }
+
+  const stopCondition = () => i >= total;
+  const yieldCondition = () => i % 1000 == 0;
+
+  hbf1.setScriptLang(HBScript.value, HBLang.value);
+  hbf2.setScriptLang(HBScript.value, HBLang.value);
+
+  const loop = () => {
+    hbf1.shape(mya[i]);
+    hbf2.shape(mya[i]);
+    var diff = hbf1.compare(hbf2);
+    if ((diff == 1) || (diff == 0)) {
+      mym[i] = true;
+    }
+    i++;
+    if (yieldCondition()) {
+      updateStatusMessage(i, total);
+    }
+    if (stopCondition()) {
+      checkListChanged = true;
+      UpdateWordCount();
+      updateListByIndex(1);
+      window.scroll(0,0);
+      updateStatusMessage(-1);
+    }
+  }
+
+  doUntil(loop, stopCondition, yieldCondition);
+}
+
 function RemoveUnchecked() {
   if (!window.confirm('Delete all unchecked words? (Cannot be undone!)')) return;
   var i = 0;
-  while (true) {
-    if (mya[i] === undefined) break;
+  var counter = 0;
+  const stopCondition = () => i >= mya.length;
+  const yieldCondition= () => (counter % 1000) ==0;
+  const loop = () => {
+    counter++;
     if (!mym[i]) {
       mya.splice(i, 1);
-      mym.splice(i, 1);
+      mym.splice(i,1);
     } else {
       i++;
     }
+    if (yieldCondition()) {
+      updateStatusMessage(i, mya.length);
+    }
+    if (stopCondition()) {
+      if (!wordlist_filename.endsWith('(edited)')) wordlist_filename = wordlist_filename + ' (edited)';
+      UpdateWordCount();
+      updateListByIndex(1);
+      updateStatusMessage(-1);
+    }
   }
-  if (!wordlist_filename.endsWith('(edited)')) wordlist_filename = wordlist_filename + ' (edited)';
-  UpdateWordCount();
-  updateListByIndex(1);
+  doUntil(loop, stopCondition, yieldCondition);
 }
 
 function DateTimeForFilename() {
@@ -421,12 +729,13 @@ function handleCheckDrop(file) {
   reader.readAsText(file);
 }
 
-function handleFontXDrop(file, fontname, id) {
+function handleFontXDrop(file, fontname, id, hbo) {
   if (!file) return;
   const fileName = file.name.toLowerCase();
   if (!fileName.endsWith('.ttf') && !fileName.endsWith('.otf')) return;
   var reader = new FileReader();
   reader.onload = function(e) {
+    hbo.setFontBlob(new Uint8Array(reader.result));
     const fontFace = new FontFace(fontname, reader.result);
     const fontInfo = FontName.parse(reader.result);
     const fontName = fontInfo[0];
@@ -437,6 +746,7 @@ function handleFontXDrop(file, fontname, id) {
         document.fonts.add(fontFace);
         console.log('loaded '+file.name);
         changeFontAscentDescent(fontname, '200%', '200%');
+        updateListByField();
       },
       (err) => {
         console.error(err);
@@ -447,11 +757,11 @@ function handleFontXDrop(file, fontname, id) {
 }
 
 function handleFontOneDrop(file) {
-  handleFontXDrop(file, 'Test_Font_1', fontOneInfo);
+  handleFontXDrop(file, 'Test_Font_1', fontOneInfo, hbf1);
 }
 
 function handleFontTwoDrop(file) {
-  handleFontXDrop(file, 'Test_Font_2', fontTwoInfo);
+  handleFontXDrop(file, 'Test_Font_2', fontTwoInfo, hbf2);
 }
 
 patchDragDrop(WordsDragDrop, handleWordsDrop);
@@ -461,6 +771,6 @@ patchDragDrop(fontTwoInfo, handleFontTwoDrop);
 
 </script>
 
-<p>2024-11-08</p>
+<p>2024-11-14</p>
 </body>
 </html>

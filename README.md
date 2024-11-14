@@ -29,6 +29,25 @@ After loading the word list...
 - Click "Invert" to toggle all checkboxes
 - Click "Delete Unchecked" to permanently remove words
 
+## HarfBuzz addition
+HarfBuzz is used to populate the "Diff" column.
+
+HINT: Click on the "Diff" to show/hide the icon legends.
+
+The Diff column will help you quickly identify differences in the HarfBuzz output between the two fonts.
+
+- If the GIDs, cluster, advance, and offsets match you will see a green checkbox.
+- If only the GIDs are different (because the font has auto assigned GIDs when building), this field will be blank.
+- Other differences are shown with icons.
+
+### Check Similar
+The "Check Similar" button will iterate through all words in the list,
+and check entries that are identical, or only have GID differences.
+
+NOTE: This process is time consuming, and there will be a red progress update underneath the "Show Lang/Script" link at the bottom of the page.
+
+You can then use "Invert" and "Delete Unchecked" to manage and prune the list.
+
 ### Sequences
 To remove duplicates from a word list:
 
