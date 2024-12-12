@@ -52,21 +52,16 @@ td {
 }
 </style>
 
+<script type="text/javascript" src="hb.js"></script> <!-- Module - REQUIRED -->
 <script type="text/javascript" src="hbjs.js"></script> <!-- Wrapper, can be used without -->
 <script type="text/javascript" src="fontname.min.js"></script>
 <script>
 
-// We could use instantiateStreaming but it's not supported in Safari yet
-// https://bugs.webkit.org/show_bug.cgi?id=173105
-var wasmUrl = 'hb.wasm';
-if (window.origin == 'null') wasmUrl = 'https://mattmatic.github.io/hbfontcompare/hb.wasm';
-
-fetch(wasmUrl).then(function (x) {
-  return x.arrayBuffer();
-}).then(function (wasm) {
-  return WebAssembly.instantiate(wasm);
-}).then(function (result) {
-  window.hb = hbjs(result.instance);
+let harfBuzzModule; // not really needed with the hbjs wrapper
+createHarfBuzz().then(hbmodule=>{
+  harfBuzzModule = hbmodule;
+  window.hb = hbjs(hbmodule);
+  hbversion.innerHTML = hb.version_string();
 });
 
 //------------------------------
@@ -771,6 +766,7 @@ patchDragDrop(fontTwoInfo, handleFontTwoDrop);
 
 </script>
 
-<p>2024-11-14</p>
+<p></br>HarfBuzz Version: <span id="hbversion"></span>
+</br>Tool Version: 2024-12-12</p>
 </body>
 </html>
