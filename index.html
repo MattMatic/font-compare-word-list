@@ -134,14 +134,28 @@ function wordHTML(txt,fnt) {
 function MarkUpdate(e) {
   var n = e.name;
   n = parseInt(n.substring(4)) - 1;
-  mym[n] = e.checked;
+  wordList[n].setChecked(e.checked);
   checkListChanged = true;
 }
 
 function BuildMarkHtml(n) {
   var txt = '<input type="checkbox" onclick="MarkUpdate(this);" name="mark'+(n+1)+'"';
-  if (mym[n]) txt = txt + ' checked';
+  if (wordList[n].getChecked()) txt = txt + ' checked';
   txt = txt + '>';
+  return txt;
+}
+
+function NoteUpdate(e) {
+  var n = e.name;
+  n = parseInt(n.substring(4)) - 1;
+  wordList[n].setNote(e.value);
+  checkListChanged = true;
+}
+
+function BuildNoteHtml(n) {
+  var txt = '<input type="text" onchange="NoteUpdate(this);" onkeyup="NoteUpdate(this);" name="note'+(n+1)+'" value="';
+  txt = txt + wordList[n].getNote();
+  txt = txt + '" size=8>';
   return txt;
 }
 
@@ -164,27 +178,28 @@ function diffFieldToText(diff) {
   return res;
 }
 
-function addEntry(line, txt) {
+function addEntry(lineNo, theWordEntry) {
   //if (txt == '') return;
   var table = document.getElementById('word_list');
   var row = table.insertRow();
   var idx=1;
 
-  hbf1.shape(txt);
-  hbf2.shape(txt);
+  var phrase = theWordEntry.getWord();
+  hbf1.shape(phrase);
+  hbf2.shape(phrase);
   var diff = hbf1.compare(hbf2);
 
-  row.insertCell(0).innerHTML = '<div align="center">'+(line+1)+
-      BuildMarkHtml(line)+'</div>';
+  row.insertCell(0).innerHTML = '<div align="center">'+(lineNo+1)+
+      BuildMarkHtml(lineNo)+' '+BuildNoteHtml(lineNo)+'</div>';
   row.insertCell(idx++).innerHTML = '<div class="HBC">'+
       diffFieldToText(diff)+'</div>';
-  row.insertCell(idx++).innerHTML = wordHTML(txt, "test_1");
-  row.insertCell(idx++).innerHTML = wordHTML(txt, "test_2");
+  row.insertCell(idx++).innerHTML = wordHTML(phrase, "test_1");
+  row.insertCell(idx++).innerHTML = wordHTML(phrase, "test_2");
   row.insertCell(idx++).innerHTML =
       //'<p style="line-height: 0px; " align="center">'
       '<p class="overlap">'
-    + '<span class="test_2" style="color: #ff6600;">' + txt + '</span><br>'
-    + '<span class="test_1">' + txt + '</span></p>'
+    + '<span class="test_2" style="color: #ff6600;">' + phrase + '</span><br>'
+    + '<span class="test_1">' + phrase + '</span></p>'
 }
 function addrow() {
   var field = document.getElementById("text");
@@ -212,8 +227,8 @@ function updateListByIndex(idx) {
   }
   var n =  per_block;
   for (i=(idx-1); i < (idx-1+n); i++) {
-    if (mya[i] === undefined) break;
-    addEntry(i, mya[i]);
+    if (wordList[i] === undefined) break;
+    addEntry(i, wordList[i]);
   }
   document.getElementById('start').value = String(idx);
 }
@@ -222,8 +237,8 @@ function getStart() {
   if (i < 1) {
     i = 1;
   }
-  if (i > mya.length) {
-    i = mya.length-1;
+  if (i > wordList.length) {
+    i = wordList.length-1;
   }
   return i;
 }
@@ -238,7 +253,7 @@ function updateListByField() {
 }
 function updateListNext() {
   start_index = getStart() + per_block;
-  if (start_index > mya.length) start_index = mya.length - 2;
+  if (start_index > wordList.length) start_index = wordList.length - 2;
   if (start_index < 1) start_index = 1;
   updateListByIndex(start_index);
 }
@@ -298,14 +313,14 @@ function updateAlign() {
 
 <table border=2 cellspacing="8px" width='100%' id='word_list'>
   <tr>
-    <th width='7%'>#</th>
+    <th width='16%'># / Note</th>
     <th width='6%'><a href='javascript:void(0)' onclick='toggleHBIcons();'>Diff</a>
       <div id='HBIcons' hidden>
       </div>
     </th>
-    <th width='31%' id='fontOneInfo'>Drag-and-Drop Font 1</th>
-    <th width='31%' id='fontTwoInfo'>Drag-and-Drop Font 2</th>
-    <th width='31%'>Overlap</th>
+    <th width='26%' id='fontOneInfo'>Drag-and-Drop Font 1</th>
+    <th width='26%' id='fontTwoInfo'>Drag-and-Drop Font 2</th>
+    <th width='26%'>Overlap</th>
   </tr>
 </table>
 
@@ -326,7 +341,8 @@ function updateAlign() {
       <button onclick='ClearCheckListUser();'>Clear All</button> &bull;
       <button onclick='InvertCheckList();'>Invert</button> &bull;
       </br>
-      <button onclick='CheckSimilar();'>Check Similar</button>
+      <button onclick='CheckSimilar();'>Check Similar</button> &bull;
+      <button onclick='CheckNotes();'>Check Notes</button>
     </td>
     <td id='WordsDragDrop' align='center'>Drag-and-drop Word List .txt file here</br>
       <button onclick='RemoveUnchecked();'>Delete Unchecked</button></br>
@@ -453,6 +469,58 @@ class hbFont {
 var hbf1 = new hbFont;
 var hbf2 = new hbFont;
 
+class wordEntryClass {
+  constructor(line) {
+    const tempArray = line.split('\t');
+    this.word = tempArray[0];
+    this.note = tempArray[1] || '';
+    this.checked = false;
+    //??//this.checked = (tempArray[2] === 'x') || (tempArray[2] === 'X'); //??
+  }
+  getWord()     { return this.word; }
+  getChecked()  { return this.checked; }
+  setChecked(isChecked) { this.checked = isChecked; }
+  setNote(txt)  { this.note = txt; }
+  getNote()     { return this.note; }
+  // The line for the check list file output
+  getLine() {
+    var txt = this.word;
+    if (this.note && (this.note.length > 0)) {
+      txt = txt + '\t' + this.note;
+    }
+    return txt;
+  }
+}
+
+var wordList = []; // An array of wordEntry objects
+
+function buildListFromFileContents(txt)
+{
+  var lines = txt.split(/\r?\n+/g);
+  var tempWordList = [];  // Start empty
+  var i = 0;
+  while (i < lines.length) {
+    const wordEntry = new wordEntryClass(lines[i]);
+    if (wordEntry.getWord().length > 0) {
+      tempWordList.push(wordEntry);
+    }
+    i++;
+  }
+  return tempWordList;
+}
+
+function findWordInList(theList, theWord)
+{
+  var i = 0;
+  while (i < theList.length) {
+    if (theList[i].getWord() === theWord) {
+      return i;
+    }
+    i++;
+  }
+  return -1;
+}
+
 // Show/Hide the language & script fields
 function togglePropertiesVisibility() {
   languageProperties.hidden = !languageProperties.hidden;
@@ -479,7 +547,11 @@ function updateLanguage() {
 }
 
 function ClearCheckList() {
-  mym = []
+  var i = 0;
+  while (i < wordList.length) {
+    wordList[i].setChecked(false);
+    i++;
+  }
   checkListChanged = false;
 }
 
@@ -493,12 +565,8 @@ function ClearCheckListUser() {
 
 function InvertCheckList() {
   var i = 0;
-  while (true) {
-    if (mya[i] === undefined) break;
-    if (mym[i])
-      mym[i] = false;
-    else
-      mym[i] = true;
+  while (i < wordList.length) {
+    wordList[i].setChecked(!wordList[i].getChecked());
     i++;
   }
   checkListChanged = true;
@@ -540,28 +608,6 @@ function doUntil(loop, stopCondition, yieldCondition) {
     }
   });
 }
-function CheckSimilar_blocking() {
-  hbf1.setScriptLang(HBScript.value, HBLang.value);
-  hbf2.setScriptLang(HBScript.value, HBLang.value);
-  var i = 0;
-  var ms_s = +new Date();
-  while (true) {
-    if (mya[i] === undefined) break;
-    hbf1.shape(mya[i]);
-    hbf2.shape(mya[i]);
-    var diff = hbf1.compare(hbf2);
-    if ((diff == 1) || (diff == 0)) {
-      mym[i] = true;
-    }
-    i++;
-  }
-  var ms_e = +new Date();
-  console.log('CheckSimilar:', ms_s, ms_e, ms_e-ms_s);
-  checkListChanged = true;
-  UpdateWordCount();
-  updateListByIndex(1);
-  window.scroll(0,0);
-}
 
 function updateStatusMessage(i, total) {
   if (i <= 0)
@@ -572,7 +618,7 @@ function updateStatusMessage(i, total) {
 
 function CheckSimilar() {
   let i = 0;
-  const total = mya.length;
+  const total = wordList.length;
 
   if (total > 5000) {
     if (!window.confirm('This will take a LONG time. Continue?')) return;
@@ -585,11 +631,12 @@ function CheckSimilar() {
   hbf2.setScriptLang(HBScript.value, HBLang.value);
 
   const loop = () => {
-    hbf1.shape(mya[i]);
-    hbf2.shape(mya[i]);
+    var phrase = wordList[i].getWord();
+    hbf1.shape(phrase);
+    hbf2.shape(phrase);
     var diff = hbf1.compare(hbf2);
     if ((diff == 1) || (diff == 0)) {
-      mym[i] = true;
+      wordList[i].setChecked(true);
     }
     i++;
     if (yieldCondition()) {
@@ -607,24 +654,38 @@ function CheckSimilar() {
   doUntil(loop, stopCondition, yieldCondition);
 }
 
+function CheckNotes() {
+  var i = 0;
+  while (i < wordList.length) {
+    var note = wordList[i].getNote();
+    if (note && (note.length > 0)) {
+      wordList[i].setChecked(true);
+    }
+    i++;
+  }
+  updateListByIndex(1);
+  window.scroll(0,0);
+  updateStatusMessage(-1);
+}
+
 function RemoveUnchecked() {
   if (!window.confirm('Delete all unchecked words? (Cannot be undone!)')) return;
   var i = 0;
   var counter = 0;
-  const stopCondition = () => i >= mya.length;
+  var newWordList = [];
+  const stopCondition = () => i >= wordList.length;
   const yieldCondition= () => (counter % 1000) ==0;
   const loop = () => {
     counter++;
-    if (!mym[i]) {
-      mya.splice(i, 1);
-      mym.splice(i,1);
-    } else {
-      i++;
+    if (wordList[i].getChecked()) {
+      newWordList.push(wordList[i]);
     }
+    i++;
     if (yieldCondition()) {
-      updateStatusMessage(i, mya.length);
+      updateStatusMessage(i, wordList.length);
     }
     if (stopCondition()) {
+      wordList = newWordList; // Assign the new updated list
       if (!wordlist_filename.endsWith('(edited)')) wordlist_filename = wordlist_filename + ' (edited)';
       UpdateWordCount();
       updateListByIndex(1);
@@ -645,9 +706,10 @@ function DateTimeForFilename() {
 function DownloadCheckList() {
   var txt = '';
   var i = 0;
-  while (true) {
-    if (mya[i] === undefined) break;
-    if (mym[i]) txt = txt + mya[i]+'\n';
+  while (i < wordList.length) {
+    if (wordList[i].getChecked()) {
+      txt = txt + wordList[i].getLine()+'\n';
+    }
     i++;
   }
   var bb = new Blob([txt], {type: 'text/plain;charset=utf-8'});
@@ -660,9 +722,6 @@ function DownloadCheckList() {
 }
 
 //---------------------------Fill in the text as separate lines------------------
-//const txt = '';
-//mya = txt.split(/\r?\n+/g)
-mya = []
 ClearCheckList();
 updateListByIndex(1)
 //===============================================================================
@@ -670,7 +729,7 @@ updateListByIndex(1)
 
 function UpdateWordCount() {
   var wlc = document.getElementById('wordcount');
-  var txt = 'Count:'+mya.length;
+  var txt = 'Count:'+wordList.length;
   if (wordlist_filename) txt = txt + ' '+wordlist_filename;
   wlc.innerHTML = txt;
 }
@@ -691,7 +750,7 @@ function handleWordsDrop(file) {
   var reader = new FileReader();
   reader.onload = function(e) {
     var txt = e.target.result;
-    mya = txt.split(/\r?\n+/g);
+    wordList = buildListFromFileContents(txt);
     ClearCheckList();
     updateListByIndex(1);
     UpdateWordCount();
@@ -707,19 +766,27 @@ function handleCheckDrop(file) {
   var reader = new FileReader();
   reader.onload = function(e) {
     var txt = e.target.result;
-    var chk = txt.split(/\r?\n+/g);
+    var checkWordList = buildListFromFileContents(txt);
     var i = 0;
-    while (true) {
-      var w = chk[i];
-      if (!w) break;
-      var mi = mya.indexOf(w);
+    while (i < checkWordList.length) {
+      var mi = findWordInList(wordList, checkWordList[i].getWord());
+      var note = checkWordList[i].getNote();
       if (mi >= 0) {
-        mym[mi] = true;
+        wordList[mi].setChecked(true);
+        if (note && (note.length > 0)) {
+          wordList[mi].setNote(note);
+        }
+      } else {
+        const newEntry = new wordEntryClass(checkWordList[i].getWord());
+        newEntry.setNote(note);
+        newEntry.setChecked(true);
+        wordList.push(newEntry);
       }
       i++;
     }
     checkListChanged = true;
     updateListByField();
+    UpdateWordCount();
   }
   reader.readAsText(file);
 }
@@ -767,6 +834,6 @@ patchDragDrop(fontTwoInfo, handleFontTwoDrop);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2024-12-12</p>
+</br>Tool Version: 2024-12-24</p>
 </body>
 </html>

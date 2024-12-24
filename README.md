@@ -27,6 +27,8 @@ After loading the word list...
 	- Note: any checks already in place will be left
 - Click "Download" to save a file `CheckList.YYYYMMDD_HHMMSS.txt` file with the words
 - Click "Invert" to toggle all checkboxes
+- Click "Check Similar" to use HarfBuzz to analyze the glyph outputs (see below)
+- Click "Check Notes" to check all entries with notes applied
 - Click "Delete Unchecked" to permanently remove words
 
 ## HarfBuzz addition
@@ -55,6 +57,14 @@ To remove duplicates from a word list:
 - Drag the same word list .txt file to the CheckList
 - Click "Delete Unchecked"
 
+## Check List Files
+
+The check list files are Tab-Delimited UTF-8 files:
+- Word
+- TAB
+- Notes
+
+You should be able to easily import into Excel, LibreOffice etc.
 
 ## Links
 - https://github.com/danbovey/fontname
