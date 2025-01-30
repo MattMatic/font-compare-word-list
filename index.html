@@ -764,6 +764,7 @@ function RemoveUnchecked() {
       wordList = newWordList; // Assign the new updated list
       if (!wordlist_filename.endsWith('(edited)')) wordlist_filename = wordlist_filename + ' (edited)';
       UpdateWordCount();
+      updateCheckListCount();
       updateListByIndex(1);
       updateStatusMessage(-1);
     }
