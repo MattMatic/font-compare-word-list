@@ -135,6 +135,7 @@ function MarkUpdate(e) {
   var n = e.name;
   n = parseInt(n.substring(4)) - 1;
   wordList[n].setChecked(e.checked);
+  updateCheckListCount();
   checkListChanged = true;
 }
 
@@ -332,7 +333,7 @@ function updateAlign() {
 </p>
 <table width="100%" border=1>
   <tr>
-    <th width="20%">CheckList</th>
+    <th width="20%">CheckList <span id="CheckListCount"></span></th>
     <th>Word List</th>
   </tr>
   <tr>
@@ -340,9 +341,11 @@ function updateAlign() {
       <button onclick='DownloadCheckList();'>Download</button> &bull;
       <button onclick='ClearCheckListUser();'>Clear All</button> &bull;
       <button onclick='InvertCheckList();'>Invert</button> &bull;
-      </br>
-      <button onclick='CheckSimilar();'>Check Similar</button> &bull;
       <button onclick='CheckNotes();'>Check Notes</button>
+      </br>
+      HarfBuzz Operations:</br>
+      <button onclick='CheckSimilar();'>Check Similar</button> &bull;
+      <button onclick='UpdateDifferences();'>Update Differences</button>
     </td>
     <td id='WordsDragDrop' align='center'>Drag-and-drop Word List .txt file here</br>
       <button onclick='RemoveUnchecked();'>Delete Unchecked</button></br>
@@ -509,6 +512,16 @@ function buildListFromFileContents(txt)
   return tempWordList;
 }
 
+function getWordCheckCount() {
+  var count = 0;
+  var i = 0;
+  while (i < wordList.length) {
+    if (wordList[i].getChecked()) count++;
+    i++;
+  }
+  return count;
+}
+
 function findWordInList(theList, theWord)
 {
   var i = 0;
@@ -519,6 +532,25 @@ function findWordInList(theList, theWord)
     i++;
   }
   return -1;
+}
+
+function updateCheckListCount() {
+  var count = getWordCheckCount();
+  CheckListCount.innerHTML =' '+count+'/'+wordList.length;
+}
+
+function checkBothFontsLoaded() {
+  var res = true;
+  if (!hbf1.fileDescription) res = false;
+  if (!hbf2.fileDescription) res = false;
+  if (hbf1.fileDescription === '') res = false;
+  if (hbf2.fileDescription === '') res = false;
+  if (hbf1.fileDescription === hbf2.fileDescription) res = false;
+  if (!res)
+  {
+    window.alert('Please load two fonts to compare');
+  }
+  return res;
 }
 
 // Show/Hide the language & script fields
@@ -552,6 +584,7 @@ function ClearCheckList() {
     wordList[i].setChecked(false);
     i++;
   }
+  updateCheckListCount();
   checkListChanged = false;
 }
 
@@ -569,6 +602,7 @@ function InvertCheckList() {
     wordList[i].setChecked(!wordList[i].getChecked());
     i++;
   }
+  updateCheckListCount();
   checkListChanged = true;
   updateListByField();
 }
@@ -620,6 +654,7 @@ function CheckSimilar() {
   let i = 0;
   const total = wordList.length;
 
+  if (!checkBothFontsLoaded()) return;
   if (total > 5000) {
     if (!window.confirm('This will take a LONG time. Continue?')) return;
   }
@@ -644,6 +679,7 @@ function CheckSimilar() {
     }
     if (stopCondition()) {
       checkListChanged = true;
+      updateCheckListCount();
       UpdateWordCount();
       updateListByIndex(1);
       window.scroll(0,0);
@@ -666,6 +702,46 @@ function CheckNotes() {
   updateListByIndex(1);
   window.scroll(0,0);
   updateStatusMessage(-1);
+}
+
+function UpdateDifferences() {
+  let i = 0;
+  const total = wordList.length;
+
+  if (!checkBothFontsLoaded()) return;
+  if (total > 5000) {
+    if (!window.confirm('This will take a LONG time. Continue?')) return;
+  }
+
+  const stopCondition = () => i >= total;
+  const yieldCondition = () => i % 1000 == 0;
+
+  hbf1.setScriptLang(HBScript.value, HBLang.value);
+  hbf2.setScriptLang(HBScript.value, HBLang.value);
+
+  const loop = () => {
+    var phrase = wordList[i].getWord();
+    hbf1.shape(phrase);
+    hbf2.shape(phrase);
+    var diff = hbf1.compare(hbf2);
+    if ((diff == 1) || (diff == 0)) {
+      wordList[i].setChecked(!wordList[i].getChecked());
+    }
+    i++;
+    if (yieldCondition()) {
+      updateStatusMessage(i, total);
+    }
+    if (stopCondition()) {
+      checkListChanged = true;
+      updateCheckListCount();
+      UpdateWordCount();
+      updateListByIndex(1);
+      window.scroll(0,0);
+      updateStatusMessage(-1);
+    }
+  }
+
+  doUntil(loop, stopCondition, yieldCondition);
 }
 
 function RemoveUnchecked() {
@@ -785,6 +861,7 @@ function handleCheckDrop(file) {
       i++;
     }
     checkListChanged = true;
+    updateCheckListCount();
     updateListByField();
     UpdateWordCount();
   }
@@ -834,6 +911,6 @@ patchDragDrop(fontTwoInfo, handleFontTwoDrop);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2024-12-24</p>
+</br>Tool Version: 2025-01-30</p>
 </body>
 </html>
