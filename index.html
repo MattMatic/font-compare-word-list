@@ -644,7 +644,7 @@ function doUntil(loop, stopCondition, yieldCondition) {
         // Execute a single inner loop iteration
         loop();
 
-        if (stopCondition()) {
+        if (stopCondition() /*|| AbortTheLoop*/) {
             // Resolve promise, exit outer loop,
                         // and do not re-enter
             AbortButton.hidden = true;
@@ -685,7 +685,7 @@ function CheckSimilar() {
     if (!window.confirm('This will take a LONG time. Continue?')) return;
   }
 
-  const stopCondition = () => i >= total;
+  const stopCondition = () => (i >= total) || AbortTheLoop;
   const yieldCondition = () => i % 1000 == 0;
   const checkGIDs = HBGIDs.checked;
 
@@ -741,7 +741,7 @@ function UpdateDifferences() {
     if (!window.confirm('This will take a LONG time. Continue?')) return;
   }
 
-  const stopCondition = () => i >= total;
+  const stopCondition = () => (i >= total) || AbortTheLoop;
   const yieldCondition = () => i % 1000 == 0;
   const checkGIDs = HBGIDs.checked;
 
