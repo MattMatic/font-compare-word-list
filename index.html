@@ -297,21 +297,33 @@ function updateAlign() {
   Compare Font Word List Tool
 </h1>
 
-<label for='start'>Start:</label><input type='text' id='start' placeholder='Start' value='1'/>
-<button onclick='updateListByField();'>Go</button>
-<button onclick='updateListPrev();' accesskey='2'>Prev (Alt-2)</button>
-<button onclick='updateListNext();' accesskey='3'>Next (Alt-3)</button>
-<span id='wordcount'></span>
-</br>
-<span>
-  <input type='radio' name='alignment' value='left' onclick="updateAlign();">
-    <label for='left'>Left</label>
-  <input type='radio' name='alignment' value='center' onclick="updateAlign();" checked>
-    <label for='center'>Center</label>
-  <input type='radio' name='alignment' value='right' onclick="updateAlign();">
-    <label for='right'>Right</label>
-</span>
 
+<table border=1 cellspacing="8px" width="100%">
+  <tr>
+    <td width='22%'>
+      <label for='start'>Start:</label><input type='text' id='start' placeholder='Start' value='1' width='8'/>
+      <button onclick='updateListByField();'>Go</button>
+    </td>
+    <td width='26%' align='center'>
+      <button onclick='updateListPrev();' accesskey='2'>Prev (Alt-2)</button>
+      <button onclick='updateListNext();' accesskey='3'>Next (Alt-3)</button>
+    </td>
+    <td width="26%" id='WordsDragDrop' align='center'>
+      <span id='wordcount'><b><span style='background-color:cyan;'>Drag-and-drop Word List (.txt) file here</b></span></span>
+    </td>
+    <td align='center'>
+      <span>
+        <input type='radio' name='alignment' value='left' onclick="updateAlign();">
+          <label for='left'>Left</label>
+        <input type='radio' name='alignment' value='center' onclick="updateAlign();" checked>
+          <label for='center'>Center</label>
+        <input type='radio' name='alignment' value='right' onclick="updateAlign();">
+          <label for='right'>Right</label>
+      </span>
+    </td>
+  </tr>
+</table>
+</br>
 <table border=2 cellspacing="8px" width='100%' id='word_list'>
   <tr>
     <th width='16%'># / Note</th>
@@ -333,33 +345,36 @@ function updateAlign() {
 </p>
 <table width="100%" border=1>
   <tr>
-    <th width="20%">CheckList <span id="CheckListCount"></span></th>
-    <th>Word List</th>
+    <td width='22%' id='CheckDragDrop' align='left'>
+        <b><span id='CheckListCount'><span style='background-color:cyan;'>Drag-and-drop CheckList .txt here</span></span></b>
+    </td>
+    <td>
+      <button onclick='DownloadCheckList();' title='Save CheckList word file'>Download</button> &bull;
+      <button onclick='ClearCheckListUser();' title='Remove check from all words'>Clear All</button> &bull;
+      <button onclick='InvertCheckList();' title='Toggle check for all words'>Invert</button> &bull;
+      <button onclick='CheckNotes();' title='Check all words that have some text in the note field'>Check Notes</button> &bull;
+      <button onclick='RemoveUnchecked();' title='Remove all words that are NOT checked (cannot be undone!)'>Delete Unchecked</button></br>
+    </td>
   </tr>
   <tr>
-    <td id='CheckDragDrop' align='center'>Drag-and-drop CheckList .txt here</br>
-      <button onclick='DownloadCheckList();'>Download</button> &bull;
-      <button onclick='ClearCheckListUser();'>Clear All</button> &bull;
-      <button onclick='InvertCheckList();'>Invert</button> &bull;
-      <button onclick='CheckNotes();'>Check Notes</button>
-      </br>
-      HarfBuzz Operations:</br>
-      <button onclick='CheckSimilar();'>Check Similar</button> &bull;
-      <button onclick='UpdateDifferences();'>Update Differences</button>
-    </td>
-    <td id='WordsDragDrop' align='center'>Drag-and-drop Word List .txt file here</br>
-      <button onclick='RemoveUnchecked();'>Delete Unchecked</button></br>
-      <a href='javascript:void(0)' onclick='togglePropertiesVisibility(); return false;' id='hrefLanguageProperties'>
-        Show Lang/Script
+    <td>
+      <a href='javascript:void(0)' onclick='toggleVisibilityLabel(languageProperties, hrefLanguageProperties); return false;' id='hrefLanguageProperties'>
+        Show HarfBuzz Operations
       </a>
+    </td>
+    <td>
       <div id='languageProperties' hidden>
       <table border=1>
-        <tr><th>HTML Lang:</th><td><input type='text' id='HTMLLang' oninput='updateLanguage();'/></td></tr>
-        <tr><th>HarfBuzz Script:</th><td><input type='text' id='HBScript' oninput='updateLanguage();'/></td></tr>
-        <tr><th>HarfBuzz Lang:</th><td><input type='text' id='HBLang' oninput='updateLanguage();'/></td></tr>
+        <tr><th>HTML Lang:</th><td><input type='text' id='HTMLLang' oninput='updateLanguage();' title='Web page language ID'/></td></tr>
+        <tr><th>HarfBuzz Script:</th><td><input type='text' id='HBScript' oninput='updateLanguage();' title='HarfBuzz script tag (4 character). e.g. "arab"'/></td></tr>
+        <tr><th>HarfBuzz Lang:</th><td><input type='text' id='HBLang' oninput='updateLanguage();' title='HarfBuzz language tag (4 character)'/></td></tr>
+        <tr><th>Compare GIDs:</th><td><input type='checkbox' id='HBGIDs' oninput='updateLanguage();' title='Unchecked = ignore glyph ID when comparing; Checked = compare glyph ID in HarfBuzz output'/></td></tr>
+        <tr><td align='right'>Progress:</td><td><div id='statusUpdate'>-</div> <button onclick='AbortProgress();' id='AbortButton' hidden>Abort!</button></td>
       </table>
+      </br>
+      <button onclick='CheckSimilar();' title='Check all words where HarfBuzz output is the same (Compare GIDs is considered)'>Check Similar</button> &bull;
+      <button onclick='UpdateDifferences();' title='(Regression test) For each word where HarfBuzz differs between Font#1 and Font#2 -> toggle the check mark'>Update Differences</button>
       </div>
-      <div id='statusUpdate'>-</div>
     </td>
   </tr>
 </table>
@@ -536,7 +551,7 @@ function findWordInList(theList, theWord)
 
 function updateCheckListCount() {
   var count = getWordCheckCount();
-  CheckListCount.innerHTML =' '+count+'/'+wordList.length;
+  CheckListCount.innerHTML = 'Checked '+count+'/'+wordList.length;
 }
 
 function checkBothFontsLoaded() {
@@ -553,14 +568,13 @@ function checkBothFontsLoaded() {
   return res;
 }
 
-// Show/Hide the language & script fields
-function togglePropertiesVisibility() {
-  languageProperties.hidden = !languageProperties.hidden;
-  let txt = hrefLanguageProperties.text;
-  if (languageProperties.hidden)
-    hrefLanguageProperties.text = txt.replace('Hide', 'Show');
+function toggleVisibilityLabel(ele, href) {
+  ele.hidden = !ele.hidden;
+  let txt = href.text;
+  if (ele.hidden)
+    href.text = txt.replace('Hide', 'Show');
   else
-    hrefLanguageProperties.text = txt.replace('Show', 'Hide');
+    href.text = txt.replace('Show', 'Hide');
 }
 
 function toggleHBIcons() {
@@ -584,7 +598,6 @@ function ClearCheckList() {
     wordList[i].setChecked(false);
     i++;
   }
-  updateCheckListCount();
   checkListChanged = false;
 }
 
@@ -593,6 +606,7 @@ function ClearCheckListUser() {
     if (!window.confirm('Check List has changed! Clear all?')) return;
   }
   ClearCheckList();
+  updateCheckListCount();
   updateListByField();
 }
 
@@ -607,9 +621,20 @@ function InvertCheckList() {
   updateListByField();
 }
 
+var AbortTheLoop = false;
+
+function AbortReset() {
+  AbortTheLoop = false;
+  AbortButton.hidden = false;
+}
+
+function AbortProgress() {
+  AbortTheLoop = true;
+}
 
 // See: https://elplatt.com/javascript-updating-dom-during-long-running-computation
 function doUntil(loop, stopCondition, yieldCondition) {
+    AbortReset();
     // Wrap function in promise so it can run asynchronously
     return new Promise((resolve, reject) => {
 
@@ -622,6 +647,7 @@ function doUntil(loop, stopCondition, yieldCondition) {
         if (stopCondition()) {
             // Resolve promise, exit outer loop,
                         // and do not re-enter
+            AbortButton.hidden = true;
             resolve();
             break;
         } else if (yieldCondition()) {
@@ -661,6 +687,7 @@ function CheckSimilar() {
 
   const stopCondition = () => i >= total;
   const yieldCondition = () => i % 1000 == 0;
+  const checkGIDs = HBGIDs.checked;
 
   hbf1.setScriptLang(HBScript.value, HBLang.value);
   hbf2.setScriptLang(HBScript.value, HBLang.value);
@@ -670,7 +697,7 @@ function CheckSimilar() {
     hbf1.shape(phrase);
     hbf2.shape(phrase);
     var diff = hbf1.compare(hbf2);
-    if ((diff == 1) || (diff == 0)) {
+    if (((diff == 1) && !checkGIDs) || (diff == 0)) {
       wordList[i].setChecked(true);
     }
     i++;
@@ -700,6 +727,7 @@ function CheckNotes() {
     i++;
   }
   updateListByIndex(1);
+  updateCheckListCount();
   window.scroll(0,0);
   updateStatusMessage(-1);
 }
@@ -715,6 +743,7 @@ function UpdateDifferences() {
 
   const stopCondition = () => i >= total;
   const yieldCondition = () => i % 1000 == 0;
+  const checkGIDs = HBGIDs.checked;
 
   hbf1.setScriptLang(HBScript.value, HBLang.value);
   hbf2.setScriptLang(HBScript.value, HBLang.value);
@@ -724,7 +753,7 @@ function UpdateDifferences() {
     hbf1.shape(phrase);
     hbf2.shape(phrase);
     var diff = hbf1.compare(hbf2);
-    if ((diff == 1) || (diff == 0)) {
+    if (((diff == 1) && checkGIDs) || (diff == 0)) {
       wordList[i].setChecked(!wordList[i].getChecked());
     }
     i++;
@@ -912,6 +941,6 @@ patchDragDrop(fontTwoInfo, handleFontTwoDrop);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-01-30</p>
+</br>Tool Version: 2025-01-31</p>
 </body>
 </html>
