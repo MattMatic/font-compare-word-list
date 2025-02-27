@@ -126,6 +126,7 @@ function deleteFontByName(name) {
 start_index = 1
 per_block = 100
 line = 1
+
 function wordHTML(txt,fnt) {
   //return '<div class="'+fnt+'" align="center"><p>'+txt+'</p></div>'
   return '<div class="'+fnt+'"><p>'+txt+'</p></div>'
@@ -202,20 +203,6 @@ function addEntry(lineNo, theWordEntry) {
     + '<span class="test_2" style="color: #ff6600;">' + phrase + '</span><br>'
     + '<span class="test_1">' + phrase + '</span></p>'
 }
-function addrow() {
-  var field = document.getElementById("text");
-  var txt = field.value;
-  addUrdu(line, txt)
-  line++;
-  field.value = '';
-}
-function dokey(ele) {
-  ele.preventDefault();
-  if (ele.keyCode == 13) {
-    addrow();
-  }
-  return false;
-}
 function updateListByIndex(idx) {
   hbf1.setScriptLang(HBScript.value, HBLang.value);
   hbf2.setScriptLang(HBScript.value, HBLang.value);
@@ -233,6 +220,7 @@ function updateListByIndex(idx) {
   }
   document.getElementById('start').value = String(idx);
 }
+
 function getStart() {
   var i = Number(document.getElementById('start').value);
   if (i < 1) {
@@ -243,27 +231,30 @@ function getStart() {
   }
   return i;
 }
+
 function setStart(idx) {
   document.getElementById('start').value = String(idx);
 }
+
 function updateListByField() {
   start_index = getStart();
   if (start_index <= 1) start_index = 1;
   setStart(start_index);
   updateListByIndex(start_index);
 }
+
 function updateListNext() {
   start_index = getStart() + per_block;
   if (start_index > wordList.length) start_index = wordList.length - 2;
   if (start_index < 1) start_index = 1;
   updateListByIndex(start_index);
 }
+
 function updateListPrev() {
   start_index = getStart() - per_block;
   if (start_index < 1) start_index = 1;
   updateListByIndex(start_index);
 }
-
 
 function updateCssStyle(name, styleid, value) {
   const rules = document.styleSheets[0].cssRules;
@@ -274,6 +265,7 @@ function updateCssStyle(name, styleid, value) {
     }
   }
 }
+
 function updateAlign() {
   const alignRadios = document.getElementsByName('alignment');
   var text_align = 'center';
@@ -941,6 +933,6 @@ patchDragDrop(fontTwoInfo, handleFontTwoDrop);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-01-31</p>
+</br>Tool Version: 2025-02-27</p>
 </body>
 </html>
