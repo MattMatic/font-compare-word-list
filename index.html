@@ -127,6 +127,8 @@ start_index = 1
 per_block = 100
 line = 1
 
+update_interval = 131;
+
 function wordHTML(txt,fnt) {
   //return '<div class="'+fnt+'" align="center"><p>'+txt+'</p></div>'
   return '<div class="'+fnt+'"><p>'+txt+'</p></div>'
@@ -678,12 +680,13 @@ function CheckSimilar() {
   }
 
   const stopCondition = () => (i >= total) || AbortTheLoop;
-  const yieldCondition = () => i % 1000 == 0;
+  const yieldCondition = () => i % update_interval == 0;
   const checkGIDs = HBGIDs.checked;
 
   hbf1.setScriptLang(HBScript.value, HBLang.value);
   hbf2.setScriptLang(HBScript.value, HBLang.value);
 
+  updateStatusMessage(i, total);
   const loop = () => {
     var phrase = wordList[i].getWord();
     hbf1.shape(phrase);
@@ -734,12 +737,13 @@ function UpdateDifferences() {
   }
 
   const stopCondition = () => (i >= total) || AbortTheLoop;
-  const yieldCondition = () => i % 1000 == 0;
+  const yieldCondition = () => i % update_interval == 0;
   const checkGIDs = HBGIDs.checked;
 
   hbf1.setScriptLang(HBScript.value, HBLang.value);
   hbf2.setScriptLang(HBScript.value, HBLang.value);
 
+  updateStatusMessage(i, total);
   const loop = () => {
     var phrase = wordList[i].getWord();
     hbf1.shape(phrase);
@@ -771,7 +775,7 @@ function RemoveUnchecked() {
   var counter = 0;
   var newWordList = [];
   const stopCondition = () => i >= wordList.length;
-  const yieldCondition= () => (counter % 1000) ==0;
+  const yieldCondition= () => (counter % update_interval) ==0;
   const loop = () => {
     counter++;
     if (wordList[i].getChecked()) {
@@ -828,7 +832,9 @@ updateListByIndex(1)
 function UpdateWordCount() {
   var wlc = document.getElementById('wordcount');
   var txt = 'Count:'+wordList.length;
-  if (wordlist_filename) txt = txt + ' '+wordlist_filename;
+  if (typeof wordlist_filename !== 'undefined') {
+    txt = txt + ' '+wordlist_filename;
+  }
   wlc.innerHTML = txt;
 }
 
