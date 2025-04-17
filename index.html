@@ -57,11 +57,16 @@ td {
 <script type="text/javascript" src="fontname.min.js"></script>
 <script>
 
+function onResourcesLoaded() {
+  loadFromLocalStorage();
+}
+
 let harfBuzzModule; // not really needed with the hbjs wrapper
 createHarfBuzz().then(hbmodule=>{
   harfBuzzModule = hbmodule;
   window.hb = hbjs(hbmodule);
   hbversion.innerHTML = hb.version_string();
+  onResourcesLoaded();
 });
 
 //------------------------------
@@ -129,6 +134,26 @@ line = 1
 
 update_interval = 131;
 
+function disableSaveButton() {
+  saveButton.disabled = true;
+  saveButton.style = '';
+}
+
+function enableSaveButton() {
+  saveButton.disabled = false;
+  saveButton.style = 'background-color:#f44336; color:white';
+}
+
+function checkListHasChanged() {
+  checkListChanged = true;
+  enableSaveButton();
+}
+
+function resetCheckListChanged() {
+  checkListChanged = false;
+  disableSaveButton();
+}
+
 function wordHTML(txt,fnt) {
   //return '<div class="'+fnt+'" align="center"><p>'+txt+'</p></div>'
   return '<div class="'+fnt+'"><p>'+txt+'</p></div>'
@@ -139,7 +164,7 @@ function MarkUpdate(e) {
   n = parseInt(n.substring(4)) - 1;
   wordList[n].setChecked(e.checked);
   updateCheckListCount();
-  checkListChanged = true;
+  checkListHasChanged();
 }
 
 function BuildMarkHtml(n) {
@@ -153,7 +178,7 @@ function NoteUpdate(e) {
   var n = e.name;
   n = parseInt(n.substring(4)) - 1;
   wordList[n].setNote(e.value);
-  checkListChanged = true;
+  checkListHasChanged();
 }
 
 function BuildNoteHtml(n) {
@@ -220,7 +245,11 @@ function updateListByIndex(idx) {
     if (wordList[i] === undefined) break;
     addEntry(i, wordList[i]);
   }
-  document.getElementById('start').value = String(idx);
+  const e = document.getElementById('start');
+  if (idx != e.value) {
+    enableSaveButton();
+  }
+  e.value = String(idx);
 }
 
 function getStart() {
@@ -291,6 +320,21 @@ function updateAlign() {
   Compare Font Word List Tool
 </h1>
 
+<table width="100%" border=1>
+  <tr>
+    <td width="22%">
+      Actions
+    </td>
+    <td>
+      <button id='saveButton' onclick='saveToLocalStorage();' disabled=true title='Save state in localStorage'>Save</button>
+      &bull;
+      <button onclick='clearLocalStorage();' title='Reset and Clear'>Reset</button>
+      &bull;
+      <button onclick='openFontCompareTool();' title='Open HarfBuzz Font Compare Tool'>HarfBuzz Font Compare sync</button>
+      </br>
+    </td>
+  </tr>
+</table>
 
 <table border=1 cellspacing="8px" width="100%">
   <tr>
@@ -592,7 +636,7 @@ function ClearCheckList() {
     wordList[i].setChecked(false);
     i++;
   }
-  checkListChanged = false;
+  resetCheckListChanged();
 }
 
 function ClearCheckListUser() {
@@ -611,7 +655,7 @@ function InvertCheckList() {
     i++;
   }
   updateCheckListCount();
-  checkListChanged = true;
+  checkListHasChanged();
   updateListByField();
 }
 
@@ -700,7 +744,7 @@ function CheckSimilar() {
       updateStatusMessage(i, total);
     }
     if (stopCondition()) {
-      checkListChanged = true;
+      checkListHasChanged();
       updateCheckListCount();
       UpdateWordCount();
       updateListByIndex(1);
@@ -757,7 +801,7 @@ function UpdateDifferences() {
       updateStatusMessage(i, total);
     }
     if (stopCondition()) {
-      checkListChanged = true;
+      checkListHasChanged();
       updateCheckListCount();
       UpdateWordCount();
       updateListByIndex(1);
@@ -770,7 +814,7 @@ function UpdateDifferences() {
 }
 
 function RemoveUnchecked() {
-  if (!window.confirm('Delete all unchecked words? (Cannot be undone!)')) return;
+  if (!window.confirm('Delete all unchecked words?\r\nCannot be undone!!!')) return;
   var i = 0;
   var counter = 0;
   var newWordList = [];
@@ -797,6 +841,40 @@ function RemoveUnchecked() {
   doUntil(loop, stopCondition, yieldCondition);
 }
 
+var hbfcw = null;
+
+function openFontCompareTool() {
+  api = {};
+  api.transfer = {}
+  api.transfer.script = HBScript.value;
+  api.transfer.language = HBLang.value;
+  api.transfer.direction = null;
+  api.transfer.fontBlob1 = hbf1.fontBlob;
+  api.transfer.fontBlob2 = hbf2.fontBlob;
+  api.transfer.wordList = [];
+  api.transfer.checkList = [];
+  var i = 0;
+  while (i < wordList.length) {
+    const word = wordList[i].word;
+    if (wordList[i].getChecked()) {
+      api.transfer.checkList.push(word);
+    }
+    api.transfer.wordList.push(word);
+    i++;
+  }
+  if (!hbfcw || hbfcw.closed) {
+    var hbfc_url;
+    if (window.location.hostname === 'localhost')
+      hbfc_url = '../hbfontcompare/index.html';
+    else
+      hbfc_url = 'https://mattmatic.github.io/hbfontcompare/index.html';
+    hbfcw = window.open(hbfc_url, 'mattmatic.hbfontcompare')
+  } else {
+    hbfcw.updateTransfer(api.transfer);
+    hbfcw.focus();
+  }
+}
+
 function DateTimeForFilename() {
   //  012345678901234567890123
   // '2024-11-07T14:55:03.791Z'
@@ -821,6 +899,88 @@ function DownloadCheckList() {
   a.target='_blank';
   a.click();
   //document.body.removeChild(a);
+}
+
+function saveToLocalStorage() {
+  const ls = window.localStorage;
+  try {
+    ls.setItem('wordList', JSON.stringify(wordList));
+    ls.setItem('html_language', HTMLLang.value);
+    ls.setItem('harfbuzz_script', HBScript.value);
+    ls.setItem('harfbuzz_language', HBLang.value);
+    ls.setItem('start_index', start_index);
+    if (hbf1.fontNames) {
+      ls.setItem('font1.name',    hbf1.fontNames.fullName);
+      ls.setItem('font1.version', hbf1.fontNames.version);
+    }
+    if (hbf2.fontNames) {
+      ls.setItem('font2.name',    hbf2.fontNames.fullName);
+      ls.setItem('font2.version', hbf2.fontNames.version);
+    }
+    //---- localStorage is VERY limited. Cannot save the font :-(
+    //ls.setItem('fontBlob1', JSON.stringify(hbf1.fontBlob));
+    //ls.setItem('fontBlob2', JSON.stringify(hbf2.fontBlob));
+  } catch(error) {
+    window.alert(error);
+  }
+  resetCheckListChanged(); // Because we've save it
+}
+
+function clearLocalStorage() {
+  if (!window.confirm('Clear all words, checkmarks, notes, and localStorage?\r\nCANNOT be undone!!!')) return;
+  window.localStorage.clear();
+  loadFromLocalStorage();
+  resetCheckListChanged(); // Because we've save it
+  wordList = [];
+  updateCheckListCount();
+  UpdateWordCount();
+  updateListByIndex(1);
+}
+
+var ls_wordlist = [];
+
+function setLastFontDetails(root, id) {
+  const ls = window.localStorage;
+  var name     = ls.getItem('font'+root+'.name');
+  var version  = ls.getItem('font'+root+'.version');
+  id.innerHTML = 'Drag-and-Drop Font '+root;
+  if (!name) return;
+  if (!version) return;
+  id.innerHTML = '<font color="red"><em>Drag-and-drop font:</em></br>'
+      + name + '</b></br>'
+      + '<font size="-1">'+version+'</font></font>';
+}
+
+function loadFromLocalStorage() {
+  const ls = window.localStorage;
+  var _wl = ls.getItem('wordList');
+  if (_wl) {
+    ls_wordlist = JSON.parse(_wl);
+    wordList = [];
+    var i = 0;
+    while (i < ls_wordlist.length) {
+      const wle = ls_wordlist[i];
+      const wordEntry = new wordEntryClass(wle.word);
+      wordEntry.checked = wle.checked;
+      wordEntry.note = wle.note;
+      wordList.push(wordEntry);
+      i++;
+    }
+    start_index = ls.getItem('start_index');
+    if (!start_index) start_index = 1;
+    updateCheckListCount();
+    UpdateWordCount();
+    updateListByIndex(start_index);
+    window.scroll(0,0);
+    disableSaveButton();
+  }
+  setLastFontDetails('1', fontOneInfo);
+  setLastFontDetails('2', fontTwoInfo);
+  //---- localStorage is very limited - cannot store the fontBlobs, alas
+  //var _fontBlob1 = ls.getItem('fontBlob1');
+  //if (_fontBlob1) applyFontX(null, 'Test_Font_1', fontOneInfo, hbf1, _fontBlob1);
+  //var _fontBlob2 = ls.getItem('fontBlob2');
+  //if (_fontBlob2) applyFontX(null, 'Test_Font_2', fontTwoInfo, hbf2, _fontBlob2);
 }
 
 //---------------------------Fill in the text as separate lines------------------
@@ -858,6 +1018,7 @@ function handleWordsDrop(file) {
     ClearCheckList();
     updateListByIndex(1);
     UpdateWordCount();
+    enableSaveButton();
   }
   reader.readAsText(file);
 }
@@ -888,12 +1049,33 @@ function handleCheckDrop(file) {
       }
       i++;
     }
-    checkListChanged = true;
+    checkListHasChanged();
     updateCheckListCount();
     updateListByField();
     UpdateWordCount();
   }
   reader.readAsText(file);
+}
+
+function applyFontX(file, fontname, id, hbo, data) {
+  hbo.setFontBlob(new Uint8Array(data));
+  const fontFace = new FontFace(fontname, data);
+  const fontInfo = FontName.parse(data);
+  const fontName = fontInfo[0];
+  hbo.fontNames = fontName;
+  id.innerHTML = fontName.fullName + '</b></br><font size="-1">' + fontName.version + "</font>";
+  fontFace.load().then(
+    () => {
+      deleteFontByName(fontname);
+      document.fonts.add(fontFace);
+      if (file) console.log('loaded '+file.name);
+      changeFontAscentDescent(fontname, '200%', '200%');
+      updateListByField();
+    },
+    (err) => {
+      console.error(err);
+    }
+    );
 }
 
 function handleFontXDrop(file, fontname, id, hbo) {
@@ -902,33 +1084,19 @@ function handleFontXDrop(file, fontname, id, hbo) {
   if (!fileName.endsWith('.ttf') && !fileName.endsWith('.otf')) return;
   var reader = new FileReader();
   reader.onload = function(e) {
-    hbo.setFontBlob(new Uint8Array(reader.result));
-    const fontFace = new FontFace(fontname, reader.result);
-    const fontInfo = FontName.parse(reader.result);
-    const fontName = fontInfo[0];
-    id.innerHTML = fontName.fullName + '</b></br><font size="-1">' + fontName.version + "</font>";
-    fontFace.load().then(
-      () => {
-        deleteFontByName(fontname);
-        document.fonts.add(fontFace);
-        console.log('loaded '+file.name);
-        changeFontAscentDescent(fontname, '200%', '200%');
-        updateListByField();
-      },
-      (err) => {
-        console.error(err);
-      }
-      );
+    applyFontX(file, fontname, id, hbo, reader.result);
   }
   reader.readAsArrayBuffer(file);
 }
 
 function handleFontOneDrop(file) {
   handleFontXDrop(file, 'Test_Font_1', fontOneInfo, hbf1);
+  saveToLocalStorage();
 }
 
 function handleFontTwoDrop(file) {
   handleFontXDrop(file, 'Test_Font_2', fontTwoInfo, hbf2);
+  saveToLocalStorage();
 }
 
 patchDragDrop(WordsDragDrop, handleWordsDrop);
@@ -939,6 +1107,6 @@ patchDragDrop(fontTwoInfo, handleFontTwoDrop);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-04-10</p>
+</br>Tool Version: 2025-04-17</p>
 </body>
 </html>
