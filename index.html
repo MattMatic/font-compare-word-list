@@ -56,6 +56,7 @@ td {
 <script type="text/javascript" src="hbjs.js"></script> <!-- Wrapper, can be used without -->
 <script type="text/javascript" src="fontname.min.js"></script>
 <script>
+"use strict";
 
 function onResourcesLoaded() {
   loadFromLocalStorage();
@@ -128,11 +129,13 @@ function deleteFontByName(name) {
 //------------------------------
 // Build table
 //------------------------------
-start_index = 1
-per_block = 100
-line = 1
+var start_index = 1
+var per_block = 100
+var line = 1
 
-update_interval = 131;
+var update_interval = 131;
+var checkListChanged = false;
+var wordlist_filename = '';
 
 function disableSaveButton() {
   saveButton.disabled = true;
@@ -241,7 +244,7 @@ function updateListByIndex(idx) {
     table.deleteRow(s);
   }
   var n =  per_block;
-  for (i=(idx-1); i < (idx-1+n); i++) {
+  for (var i=(idx-1); i < (idx-1+n); i++) {
     if (wordList[i] === undefined) break;
     addEntry(i, wordList[i]);
   }
@@ -289,7 +292,7 @@ function updateListPrev() {
 
 function updateCssStyle(name, styleid, value) {
   const rules = document.styleSheets[0].cssRules;
-  for (var i=0; i<rules.length; i++) {
+  for (var i=0, rl=rules.length; i<rl; i++) {
     if (rules[i].selectorText == name) {
       rules[i].style[styleid] = value;
       break;
@@ -300,7 +303,7 @@ function updateCssStyle(name, styleid, value) {
 function updateAlign() {
   const alignRadios = document.getElementsByName('alignment');
   var text_align = 'center';
-  for (var i=0; i<alignRadios.length; i++) {
+  for (var i=0, rl=alignRadios.length; i<rl; i++) {
     if (alignRadios[i].checked) {
       text_align = alignRadios[i].value;
       break;
@@ -831,7 +834,9 @@ function RemoveUnchecked() {
     }
     if (stopCondition()) {
       wordList = newWordList; // Assign the new updated list
-      if (!wordlist_filename.endsWith('(edited)')) wordlist_filename = wordlist_filename + ' (edited)';
+      if (typeof wordlist_filename !== 'undefined') {
+        if (!wordlist_filename.endsWith('(edited)')) wordlist_filename = wordlist_filename + ' (edited)';
+      }
       UpdateWordCount();
       updateCheckListCount();
       updateListByIndex(1);
@@ -905,6 +910,7 @@ function saveToLocalStorage() {
   const ls = window.localStorage;
   try {
     ls.setItem('wordList', JSON.stringify(wordList));
+    ls.setItem('wordListFilename', wordlist_filename || '');
     ls.setItem('html_language', HTMLLang.value);
     ls.setItem('harfbuzz_script', HBScript.value);
     ls.setItem('harfbuzz_language', HBLang.value);
@@ -954,6 +960,7 @@ function setLastFontDetails(root, id) {
 function loadFromLocalStorage() {
   const ls = window.localStorage;
   var _wl = ls.getItem('wordList');
+  wordlist_filename = ls.getItem('wordListFilename');
   if (_wl) {
     ls_wordlist = JSON.parse(_wl);
     wordList = [];
@@ -1085,18 +1092,17 @@ function handleFontXDrop(file, fontname, id, hbo) {
   var reader = new FileReader();
   reader.onload = function(e) {
     applyFontX(file, fontname, id, hbo, reader.result);
+    saveToLocalStorage();
   }
   reader.readAsArrayBuffer(file);
 }
 
 function handleFontOneDrop(file) {
   handleFontXDrop(file, 'Test_Font_1', fontOneInfo, hbf1);
-  saveToLocalStorage();
 }
 
 function handleFontTwoDrop(file) {
   handleFontXDrop(file, 'Test_Font_2', fontTwoInfo, hbf2);
-  saveToLocalStorage();
 }
 
 patchDragDrop(WordsDragDrop, handleWordsDrop);
@@ -1107,6 +1113,6 @@ patchDragDrop(fontTwoInfo, handleFontTwoDrop);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-04-17</p>
+</br>Tool Version: 2025-05-01</p>
 </body>
 </html>
