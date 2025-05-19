@@ -453,7 +453,7 @@ function updateAlign() {
       </br>
       <table border=1>
         <tr>
-          <th><button onclick='UpdateDifferences();' title='(Regression test) For each word where HarfBuzz differs between Font#1 and Font#2 -> toggle the check mark'>Update Differences</button></th>
+          <th><button onclick='UpdateDifferences();' title='Regression test:&#13;&#10;For each word where HarfBuzz differs between Font#1 and Font#2 -> toggle the check mark.&#13;&#10;&#13;&#10;Words left checkmarked will be:&#13;&#10;• changes that did not occur&#13;&#10;• unexpected changes'>Update Differences</button></th>
           <td><input type='checkbox' id='HBGIDs' oninput='updateLanguage();' title='Unchecked = ignore glyph ID when comparing; Checked = compare glyph ID in HarfBuzz output'>Compare GIDs</input></td>
         </tr>
       </table>
@@ -862,7 +862,8 @@ function UpdateDifferences() {
     hbf1.shape(phrase);
     hbf2.shape(phrase);
     var diff = hbf1.compare(hbf2);
-    if (((diff == 1) && checkGIDs) || (diff == 0)) {
+    const theSame = ((diff == 1) && checkGIDs) || (diff == 0);
+    if (!theSame) {
       wordList[i].setChecked(!wordList[i].getChecked());
     }
     i++;
@@ -1179,6 +1180,6 @@ patchDragDrop(fontTwoInfo, handleFontTwoDrop);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-05-15</p>
+</br>Tool Version: 2025-05-19</p>
 </body>
 </html>
