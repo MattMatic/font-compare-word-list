@@ -281,7 +281,9 @@ function updateListByIndex(idx) {
 }
 
 function getStart() {
-  var i = Number(document.getElementById('start').value);
+  var txt = document.getElementById('start').value;
+  if (isNaN(txt)) return start_index;
+  var i = Number(txt);
   if (i < 1) {
     i = 1;
   }
@@ -293,6 +295,30 @@ function getStart() {
 
 function setStart(idx) {
   document.getElementById('start').value = String(idx);
+}
+
+function gotoOrFind() {
+  var txt = document.getElementById('start').value;
+  if (isNaN(txt)) {
+    // Let's try and locate...
+    var search_index = start_index;
+    const list_length = wordList.length;
+    while (search_index < list_length) {
+      if (wordList[search_index].getWord().search(txt) >= 0) {
+        start_index = search_index + 1;
+        setStart(start_index);
+        updateListByIndex(start_index);
+        document.getElementById('start').value = txt; // Keep text in the search
+        break;
+      }
+      search_index++;
+    }
+    // Not found!
+    //document.getElementById('start').value = start_index;
+  } else {
+    // This is a number... let's jump to the location
+    updateListByField();
+  }
 }
 
 function updateListByField() {
@@ -368,7 +394,7 @@ function updateAlign() {
   <tr>
     <td width='22%'>
       <label for='start'>Start:</label><input type='text' id='start' placeholder='Start' value='1' width='8'/>
-      <button onclick='updateListByField();'>Go</button>
+      <button onclick='gotoOrFind();' title='Jump to "Start" as a line number, or &#13;&#10; search for the text in "Start"'>Go</button>
     </td>
     <td width='26%' align='center'>
       <button onclick='updateListPrev();' accesskey='2'>Prev (Alt-2)</button>
@@ -453,7 +479,7 @@ function updateAlign() {
       </br>
       <table border=1>
         <tr>
-          <th><button onclick='UpdateDifferences();' title='Regression test:&#13;&#10;For each word where HarfBuzz differs between Font#1 and Font#2 -> toggle the check mark.&#13;&#10;&#13;&#10;Words left checkmarked will be:&#13;&#10;• changes that did not occur&#13;&#10;• unexpected changes'>Update Differences</button></th>
+          <th><button onclick='UpdateDifferences();' title='Regression test:&#13;&#10;For each word where HarfBuzz differs between Font#1 and Font#2 -> toggle the check mark.&#13;&#10;&#13;&#10;Words left checkmarked will be:&#13;&#10;• requested changes that did not occur&#13;&#10;• unexpected changes'>Update Differences</button></th>
           <td><input type='checkbox' id='HBGIDs' oninput='updateLanguage();' title='Unchecked = ignore glyph ID when comparing; Checked = compare glyph ID in HarfBuzz output'>Compare GIDs</input></td>
         </tr>
       </table>
@@ -1180,6 +1206,6 @@ patchDragDrop(fontTwoInfo, handleFontTwoDrop);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-05-19</p>
+</br>Tool Version: 2025-05-21</p>
 </body>
 </html>
