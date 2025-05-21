@@ -47,6 +47,10 @@ table, th, td {
 td {
   align: 'left';
 }
+.hbtype table, .hbtype th, .hbtype td {
+  border: 0px;
+  padding: 4px;
+}
 .wordlist, input[type="file"] {
   background-color: #8ebf42;
 }
@@ -467,12 +471,32 @@ function updateAlign() {
         <tr>
           <th><button onclick='CheckSimilar();' title='Check all words where HarfBuzz output is the same (Compare GIDs is considered)'>Compare and Check</button></th>
           <td>
-            <input type='checkbox' id='HBCC_count'>🟥Different Count</input></br>
-            <input type='checkbox' id='HBCC_clusters'>🟨Different Clusters</input></br>
-            <input type='checkbox' id='HBCC_advance'>🟦Different Advance</input></br>
-            <input type='checkbox' id='HBCC_offset'>🟪Different Offset</input></br>
-            <input type='checkbox' id='HBCC_gids' checked>⬜Different GIDs</input></br>
-            <input type='checkbox' id='HBCC_exact' checked>✅Exact</input>
+            <table class='hbtype'>
+              <tr>
+                <td><input type='checkbox' id='HBCC_count'>🟥Different Glyph Count</input></td>
+                <td align='right'><span id='HBCC_count_no'></span></td>
+              </tr>
+              <tr>
+                <td><input type='checkbox' id='HBCC_clusters'>🟨Different Clusters</input></td>
+                <td align='right'><span id='HBCC_clusters_no'></span></td>
+              </tr>
+              <tr>
+                <td><input type='checkbox' id='HBCC_advance'>🟦Different Advance</input></td>
+                <td align='right'><span id='HBCC_advance_no'></span></td>
+              </tr>
+              <tr>
+                <td><input type='checkbox' id='HBCC_offset'>🟪Different Offset</input></td>
+                <td align='right'><span id='HBCC_offset_no'></span></td>
+              </tr>
+              <tr>
+                <td><input type='checkbox' id='HBCC_gid' checked>⬜Different GIDs</input></td>
+                <td align='right'><span id='HBCC_gid_no'></span></td>
+              </tr>
+              <tr>
+                <td><input type='checkbox' id='HBCC_identical' checked>✅Exact</input></td>
+                <td align='right'><span id='HBCC_identical_no'></span></td>
+              </tr>
+            </table>
           </td>
         </tr>
       </table>
@@ -800,15 +824,40 @@ function updateStatusMessage(i, total) {
     statusUpdate.innerHTML = '<div><font color="red">'+i + '/'+ total+'</font></div>';
 }
 
+function updateBitCountsOne(t, bits, v) {
+  if ((bits & v) !== 0) {
+    t[v] = (t[v] || 0) + 1;
+  }
+}
+
+function updateBitCounts(t, bits) {
+  updateBitCountsOne(t,bits,hb_icons.count[2]);
+  updateBitCountsOne(t,bits,hb_icons.cluster[2]);
+  updateBitCountsOne(t,bits,hb_icons.advance[2]);
+  updateBitCountsOne(t,bits,hb_icons.offset[2]);
+  updateBitCountsOne(t,bits,hb_icons.gid[2]);
+  updateBitCountsOne(t,bits,hb_icons.identical[2]);
+}
+
+function mapCountsToDisplay(t) {
+  HBCC_count_no.innerHTML     = t[hb_icons.count[2]] || '';
+  HBCC_clusters_no.innerHTML  = t[hb_icons.cluster[2]] || '';
+  HBCC_advance_no.innerHTML   = t[hb_icons.advance[2]] || '';
+  HBCC_offset_no.innerHTML    = t[hb_icons.offset[2]] || '';
+  HBCC_gid_no.innerHTML       = t[hb_icons.gid[2]] || '';
+  HBCC_identical_no.innerHTML = t[hb_icons.identical[2]] || '';
+}
+
 function CheckSimilar() {
   let i = 0;
   var bits = 0;
+  var bit_counts = [];
   if (HBCC_count.checked)     bits |= hb_icons.count[2];
   if (HBCC_clusters.checked)  bits |= hb_icons.cluster[2];
   if (HBCC_advance.checked)   bits |= hb_icons.advance[2];
   if (HBCC_offset.checked)    bits |= hb_icons.offset[2];
-  if (HBCC_gids.checked)      bits |= hb_icons.gid[2];
-  if (HBCC_exact.checked)     bits |= hb_icons.identical[2];
+  if (HBCC_gid.checked)       bits |= hb_icons.gid[2];
+  if (HBCC_identical.checked) bits |= hb_icons.identical[2];
 
   const total = wordList.length;
 
@@ -830,6 +879,7 @@ function CheckSimilar() {
     hbf1.shape(phrase);
     hbf2.shape(phrase);
     var diff = hbf1.compare(hbf2);
+    updateBitCounts(bit_counts, diff);
     if ((diff & bits) != 0) {
       wordList[i].setChecked(true);
     }
@@ -837,6 +887,7 @@ function CheckSimilar() {
     i++;
     if (yieldCondition()) {
       updateStatusMessage(i, total);
+      mapCountsToDisplay(bit_counts);
     }
     if (stopCondition()) {
       checkListHasChanged();
@@ -845,6 +896,7 @@ function CheckSimilar() {
       updateListByIndex(1);
       window.scroll(0,0);
       updateStatusMessage(-1);
+      mapCountsToDisplay(bit_counts);
     }
   }
 
@@ -1002,7 +1054,6 @@ function DownloadCheckList() {
 function saveToLocalStorage() {
   const ls = window.localStorage;
   try {
-    ls.setItem('wordList', JSON.stringify(wordList));
     ls.setItem('wordListFilename', wordlist_filename || '');
     ls.setItem('html_language', HTMLLang.value);
     ls.setItem('harfbuzz_script', HBScript.value);
@@ -1016,6 +1067,7 @@ function saveToLocalStorage() {
       ls.setItem('font2.name',    hbf2.fontNames.fullName);
       ls.setItem('font2.version', hbf2.fontNames.version);
     }
+    ls.setItem('wordList', JSON.stringify(wordList));
     //---- localStorage is VERY limited. Cannot save the font :-(
     //ls.setItem('fontBlob1', JSON.stringify(hbf1.fontBlob));
     //ls.setItem('fontBlob2', JSON.stringify(hbf2.fontBlob));
@@ -1034,6 +1086,7 @@ function clearLocalStorage() {
   updateCheckListCount();
   UpdateWordCount();
   updateListByIndex(1);
+  mapCountsToDisplay([]);
 }
 
 var ls_wordlist = [];
