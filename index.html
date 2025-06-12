@@ -64,6 +64,9 @@ td {
 
 function onResourcesLoaded() {
   loadFromLocalStorage();
+  if ((window.opener !== null) && (window.opener.openFontCompareWordListTool)) {
+    acquireFontAndLists(window.opener);
+  }
 }
 
 let harfBuzzModule; // not really needed with the hbjs wrapper
@@ -992,6 +995,7 @@ function RemoveUnchecked() {
 }
 
 var hbfcw = null;
+var api = {};
 
 function openFontCompareTool() {
   api = {};
@@ -1024,6 +1028,38 @@ function openFontCompareTool() {
     hbfcw.focus();
   }
 }
+
+function acquireFontAndLists(w) {
+  if (!w.api || !w.api.transfer) return;
+  const xfer = w.api.transfer;  // Use this as a conduit for values to be passed in here
+  HBScript.value = xfer.script;
+  HBLang.value   = xfer.language;
+  wordlist_filename = xfer.wordListFileName;
+  
+  // xfer.wordList
+  wordList = [];
+  const size = xfer.wordList.length;
+  for(let i = 0; i<size; i++) {
+    const xwe = xfer.wordList[i];
+    var wordEntry = new wordEntryClass(xwe.word);
+    wordEntry.checked = xwe.checked;
+    wordEntry.note = xwe.note;
+    wordList.push(wordEntry);    
+  }
+  applyFontX(null, 'Test_Font_1', fontOneInfo, hbf1, xfer.fontBlob);
+  // Not font 2...
+  updateLanguage();
+  updateCheckListCount();
+  UpdateWordCount();
+  updateListByIndex(start_index);
+  window.scroll(0,0);
+  disableSaveButton();
+}
+
+function updateTransfer(xfer) {
+  acquireFontAndLists(window.opener);
+}
+
 
 function DateTimeForFilename() {
   //  012345678901234567890123
@@ -1104,6 +1140,7 @@ function setLastFontDetails(root, id) {
 }
 
 function loadFromLocalStorage() {
+  console.log('loadFromLocalStorage');//!!!!
   const ls = window.localStorage;
   var _wl = ls.getItem('wordList');
   wordlist_filename = ls.getItem('wordListFilename');
@@ -1259,6 +1296,6 @@ patchDragDrop(fontTwoInfo, handleFontTwoDrop);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-05-21</p>
+</br>Tool Version: 2025-06-12</p>
 </body>
 </html>
