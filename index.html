@@ -446,6 +446,7 @@ function updateAlign() {
   <tr>
     <td width='22%' id='CheckDragDrop' align='left'>
         <b><span id='CheckListCount'><span style='background-color:cyan;'>Drag-and-drop CheckList .txt here</span></span></b>
+        <button onclick='pasteUniqueWords();' title='Paste unique words'>Paste Unique</button></br>
     </td>
     <td>
       <button onclick='DownloadCheckList();' title='Save CheckList word file'>Download</button> &bull;
@@ -994,6 +995,63 @@ function RemoveUnchecked() {
   doUntil(loop, stopCondition, yieldCondition);
 }
 
+
+function assimilateText(input) {
+  let lang = HTMLLang.value;
+  if (lang === '') lang = 'en';
+  let segmenter = new Intl.Segmenter(lang, {granularity: 'word'});
+  let segments = segmenter.segment(input);
+  let words = {};
+  for (let {segment, index, isWordLike} of segments) {
+    if (isWordLike) {
+      words[segment] = true;  // Assimilate a list
+    }
+  }
+
+  console.log(Object.keys(words));
+  const wordsLength = Object.keys(words).length;
+  const inputShort = input.substring(1, 40);
+  const confirmMessage = 'Paste '+wordsLength+' unique words from "'+inputShort+'..." ?';
+  if (!window.confirm(confirmMessage)) {
+    return;
+  }
+  var count = 0;
+  for (const w in words) {
+    var mi = findWordInList(wordList, w);
+    if (mi >= 0) {
+      // Found the word
+    } else {
+      const newEntry = new wordEntryClass(w);
+      count++;
+      newEntry.setChecked(true);
+      wordList.push(newEntry);
+    }
+  }
+  checkListHasChanged();
+  updateCheckListCount();
+  updateListByField();
+  UpdateWordCount();  
+  window.alert(count+' new words were added');
+}
+
+async function pasteUniqueWords() {
+  // Access clipboard and use Intl.segmenter to pull out words
+  let input = '';
+  //try {
+    const clipboardContents = await navigator.clipboard.read();
+    for (const item of clipboardContents) {
+      if (item.types.includes('text/plain')) {
+        const blob = await item.getType('text/plain');
+        const blobText = await blob.text();
+        assimilateText(blobText);
+      }
+    }
+  //} catch (error) {
+  //  console.log(error.message);
+  //}
+  if (!wordlist_filename) wordlist_filename = '(clipboard)';
+}
+
 var hbfcw = null;
 var api = {};
 
@@ -1296,6 +1354,6 @@ patchDragDrop(fontTwoInfo, handleFontTwoDrop);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-06-12</p>
+</br>Tool Version: 2025-06-16</p>
 </body>
 </html>
