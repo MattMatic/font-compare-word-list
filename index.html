@@ -1004,11 +1004,12 @@ function assimilateText(input) {
   let words = {};
   for (let {segment, index, isWordLike} of segments) {
     if (isWordLike) {
-      words[segment] = true;  // Assimilate a list
+      let hasNumbers =  /\d/.test(segment);
+      if (!hasNumbers)
+        words[segment] = true;  // Assimilate a list
     }
   }
 
-  console.log(Object.keys(words));
   const wordsLength = Object.keys(words).length;
   const inputShort = input.substring(1, 40);
   const confirmMessage = 'Paste '+wordsLength+' unique words from "'+inputShort+'..." ?';
@@ -1037,7 +1038,7 @@ function assimilateText(input) {
 async function pasteUniqueWords() {
   // Access clipboard and use Intl.segmenter to pull out words
   let input = '';
-  //try {
+  try {
     const clipboardContents = await navigator.clipboard.read();
     for (const item of clipboardContents) {
       if (item.types.includes('text/plain')) {
@@ -1046,9 +1047,9 @@ async function pasteUniqueWords() {
         assimilateText(blobText);
       }
     }
-  //} catch (error) {
-  //  console.log(error.message);
-  //}
+  } catch (error) {
+    console.log(error.message);
+  }
   if (!wordlist_filename) wordlist_filename = '(clipboard)';
 }
 
