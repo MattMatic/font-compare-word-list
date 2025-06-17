@@ -995,9 +995,9 @@ function RemoveUnchecked() {
   doUntil(loop, stopCondition, yieldCondition);
 }
 
-
-function assimilateText(input) {
-  let lang = HTMLLang.value;
+// See: https://github.com/MattMatic/unique-words
+function findUniqueWords(input, options) {
+  let lang = options.language;
   if (lang === '') lang = 'en';
   let segmenter = new Intl.Segmenter(lang, {granularity: 'word'});
   let segments = segmenter.segment(input);
@@ -1005,19 +1005,38 @@ function assimilateText(input) {
   for (let {segment, index, isWordLike} of segments) {
     if (isWordLike) {
       let hasNumbers =  /\d/.test(segment);
-      if (!hasNumbers)
+      if (!hasNumbers || options.numbers) {
+        if (options.normalize) segment = segment.normalize();
         words[segment] = true;  // Assimilate a list
+      }
     }
   }
+  var res = [];
+  for (const word in words) {
+    res.push(word);
+  }
+  if (options.sort) {
+    res.sort();
+  }
+  return res;
+}
 
-  const wordsLength = Object.keys(words).length;
+function assimilateText(input) {
+  var options = {
+    language: HTMLLang.value,
+    sort: true,
+    numbers: false,
+  }
+  var words = findUniqueWords(input, options);
+
+  const wordsLength = words.length;
   const inputShort = input.substring(1, 40);
   const confirmMessage = 'Paste '+wordsLength+' unique words from "'+inputShort+'..." ?';
   if (!window.confirm(confirmMessage)) {
     return;
   }
   var count = 0;
-  for (const w in words) {
+  words.forEach( (w) =>  {
     var mi = findWordInList(wordList, w);
     if (mi >= 0) {
       // Found the word
@@ -1027,7 +1046,7 @@ function assimilateText(input) {
       newEntry.setChecked(true);
       wordList.push(newEntry);
     }
-  }
+  });
   checkListHasChanged();
   updateCheckListCount();
   updateListByField();
