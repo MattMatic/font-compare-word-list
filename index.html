@@ -473,8 +473,9 @@ function updateAlign() {
   <div class='dropdown'>
     <button class='dropbtn'>🔤Word List</button>
     <div class='dropdown-content'>
-    <a href='#' onclick='DownloadCheckList();' title='Save checkmarked words to file'>⏬ Download</a></br>
-    <a href='#' onclick='pasteUniqueWords();' title='Paste Unique words - new words are checked'>⭐ Paste Unique</a></br>
+    <a href='#' onclick='DownloadCheckList();' title='Save checkmarked words to file'>⏬Download</a></br>
+    <a href='#' onclick='SortWordList();' title='Sort the word list'>📊Sort</a></br>
+    <a href='#' onclick='pasteUniqueWords();' title='Paste Unique words - new words are checked'>⭐Paste Unique</a></br>
     </div>
   </div>
   <div class='dropdown'>
@@ -559,6 +560,7 @@ function updateAlign() {
   <div class='dropdown'>
     <button class='dropbtn'>❌Delete</button>
     <div class='dropdown-content'>
+    <a href='#' onclick='DeleteDuplicates();' title='Remove all duplicate words'>📚Delete Duplicates</a></br>
     <a href='#' onclick='RemoveUnchecked();' title='Remove all words that are NOT checked (cannot be undone!)'>❌Delete Unchecked</a></br>
     <a href='#' onclick='DeleteAll();' title='Remove all words (cannot be undone!)'>⛔Delete All</a></br>
     </div>
@@ -769,17 +771,39 @@ function getWordCheckCount() {
   return count;
 }
 
-function findWordInList(theList, theWord)
+function findWordInList(theList, theWord, cache)
 {
-  var i = 0;
-  while (i < theList.length) {
-    if (theList[i].getWord() === theWord) {
-      return i;
+  if (cache === undefined) {
+    var i = 0;
+    while (i < theList.length) {
+      if (theList[i].getWord() === theWord) {
+        return i;
+      }
+      i++;
     }
-    i++;
+    return -1;
   }
-  return -1;
+  if (!cache._filled) {
+    console.log('filling cache', theList);
+    const size = theList.length;
+    for (let i=0; i<size; i++) {
+      const word = theList[i].getWord();
+      if (!cache[word])
+        cache[word] = i;
+    }
+    cache._filled = true;
+    console.log('cache', size, cache);
+  }
+  const ce = cache[theWord];
+  if (ce === undefined)
+    return -1;
+  return ce;
 }
+
+function addToList(theList, wordListEntry, cache) {
+  theList.push(wordListEntry);
+  cache[wordListEntry.getWord()] = theList.length - 1;
+} 
 
 function updateCheckListCount() {
   var count = getWordCheckCount();
@@ -1063,10 +1087,12 @@ function CheckSimilar() {
 
 function CheckNotes() {
   var i = 0;
+  var count = 0;
   while (i < wordList.length) {
     var note = wordList[i].getNote();
     if (note && (note.length > 0)) {
       wordList[i].setChecked(true);
+      count++;
     }
     i++;
   }
@@ -1074,6 +1100,7 @@ function CheckNotes() {
   updateCheckListCount();
   window.scroll(0,0);
   updateStatusMessage(-1);
+  window.alert('Checked '+count+' words');
 }
 
 function UpdateDifferences() {
@@ -1123,17 +1150,22 @@ function RemoveUnchecked() {
   if (!window.confirm('Delete all unchecked words?\r\nCannot be undone!!!')) return;
   var i = 0;
   var counter = 0;
+  var deletedCount = 0;
   var newWordList = [];
-  const stopCondition = () => i >= wordList.length;
-  const yieldCondition= () => (counter % update_interval) ==0;
+  const size = wordList.length;
+  const stopCondition = () => i >= size;
+  const yieldCondition= () => (counter % 1234 /*update_interval*/) ==0;
   const loop = () => {
     counter++;
-    if (wordList[i].getChecked()) {
-      newWordList.push(wordList[i]);
+    const wle = wordList[i];
+    if (wle.getChecked()) {
+      newWordList.push(wle);
+    } else {
+      deletedCount++;
     }
     i++;
     if (yieldCondition()) {
-      updateStatusMessage(i, wordList.length);
+      updateStatusMessage(i, size);
     }
     if (stopCondition()) {
       wordList = newWordList; // Assign the new updated list
@@ -1144,9 +1176,61 @@ function RemoveUnchecked() {
       updateCheckListCount();
       updateListByIndex(1);
       updateStatusMessage(-1);
+      window.alert('Deleted '+deletedCount);
     }
   }
   doUntil(loop, stopCondition, yieldCondition);
+}
+
+function DeleteDuplicates() {
+  if (!window.confirm('Delete duplicate words?\r\nCannot be undone!!!')) return;
+  const size = wordList.length;
+  var res = [];
+  var count = 0;
+  var cache = {};
+  for (let i=0; i<size; i++) {
+    const we = wordList[i];
+    const wei = findWordInList(res, we.getWord(), cache);
+    if (wei >= 0) {
+      // already there. Check the notes and checkmark
+      console.log('duplicate ',wei, we); //!!!!
+      res[wei].setChecked(res[wei].getChecked() || we.getChecked());
+      const note = we.getNote();
+      if (note !== '') {
+        if (res[wei].getNote() === '')
+          res[wei].setNote(note);
+        else
+          res[wei].setNote(res[wei].getNote() + '/' + we.getNote());
+      }
+      count++;
+    } else {
+      addToList(res, we, cache);
+    }
+  }
+  wordList = res;
+  UpdateWordCount();
+  updateCheckListCount();
+  updateListByIndex(1);
+  updateStatusMessage(-1);
+  window.alert('Duplicates '+count);
+}
+
+function SortWordList() {
+  if (!window.confirm('Sort word list?\r\nCannot be undone!!!')) return;
+  var compare = function(a,b) {
+    const aw = a.getWord();
+    const bw = b.getWord();
+    if (aw < bw)
+      return -1;
+    if (aw > bw)
+      return 1;
+    return 0;
+  }
+  wordList.sort(compare);
+  UpdateWordCount();
+  updateCheckListCount();
+  updateListByIndex(1);
+  updateStatusMessage(-1);
 }
 
 function DeleteAll() {
@@ -1199,15 +1283,16 @@ function assimilateText(input) {
     return;
   }
   var count = 0;
+  var cache = {};
   words.forEach( (w) =>  {
-    var mi = findWordInList(wordList, w);
+    var mi = findWordInList(wordList, w, cache);
     if (mi >= 0) {
       // Found the word
     } else {
       const newEntry = new wordEntryClass(w);
       count++;
       newEntry.setChecked(true);
-      wordList.push(newEntry);
+      addToList(wordList, newEntry, cache);
     }
   });
   checkListHasChanged();
@@ -1464,19 +1549,22 @@ function handleCheckDrop(file) {
     var txt = e.target.result;
     var checkWordList = buildListFromFileContents(txt);
     var i = 0;
+    var cache = {};
     while (i < checkWordList.length) {
-      var mi = findWordInList(wordList, checkWordList[i].getWord());
-      var note = checkWordList[i].getNote();
+      const cwle = checkWordList[i];
+      const word = cwle.getWord();
+      var mi = findWordInList(wordList, word, cache);
+      var note = cwle.getNote();
       if (mi >= 0) {
         wordList[mi].setChecked(true);
         if (note && (note.length > 0)) {
           wordList[mi].setNote(note);
         }
       } else {
-        const newEntry = new wordEntryClass(checkWordList[i].getWord());
+        const newEntry = new wordEntryClass(word);
         newEntry.setNote(note);
         newEntry.setChecked(true);
-        wordList.push(newEntry);
+        addToList(wordList, newEntry, cache);
       }
       i++;
     }
