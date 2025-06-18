@@ -54,6 +54,49 @@ td {
 .wordlist, input[type="file"] {
   background-color: #8ebf42;
 }
+.dropbtn {
+  border-radius: 4px;
+  background-color: rgba(96,192,128,0.5);
+  color: black;
+  padding: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 100%
+}
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+.dropdown-content {
+  align: left;
+  border-radius: 2px 8px 12px 12px;
+  display: none;
+  position: absolute;
+  background-color: #eff;
+  min-width: 200px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 1;
+}
+.dropdown-content a{
+  color: black;
+  padding: 8px 12px;
+  text-decoration: none;
+  display: block;
+}
+th .dropdown-content{
+  text-align: left;
+  font-weight: bold;
+  font-size: 100%;
+}
+.dropdown-content a:hover {background-color: #cee;}
+.dropdown:hover .dropdown-content {
+  display: block;
+}
+.dropdown:hover .dropbtn {
+  background-color: #3e8e41;
+  color: white;
+}
 </style>
 
 <script type="text/javascript" src="hb.js"></script> <!-- Module - REQUIRED -->
@@ -62,11 +105,13 @@ td {
 <script>
 "use strict";
 
+
 function onResourcesLoaded() {
   loadFromLocalStorage();
   if ((window.opener !== null) && (window.opener.openFontCompareWordListTool)) {
     acquireFontAndLists(window.opener);
   }
+  toggleHBIcons();
 }
 
 let harfBuzzModule; // not really needed with the hbjs wrapper
@@ -378,7 +423,7 @@ function updateAlign() {
 <body>
 
 <h1>
-  Compare Font Word List Tool
+  Font Compare Word List Tool
 </h1>
 
 <table width="100%" border=1>
@@ -423,55 +468,55 @@ function updateAlign() {
   </tr>
 </table>
 </br>
-<table border=2 cellspacing="8px" width='100%' id='word_list'>
-  <tr>
-    <th width='16%'># / Note</th>
-    <th width='6%'><a href='javascript:void(0)' onclick='toggleHBIcons();'>Diff</a>
-      <div id='HBIcons' hidden>
-      </div>
-    </th>
-    <th width='26%' id='fontOneInfo'>Drag-and-Drop Font 1</th>
-    <th width='26%' id='fontTwoInfo'>Drag-and-Drop Font 2</th>
-    <th width='26%'>Overlap</th>
-  </tr>
-</table>
 
-</p>
+<!-- Menus Start -->
+  <div class='dropdown'>
+    <button class='dropbtn'>🔤Word List</button>
+    <div class='dropdown-content'>
+    <a href='#' onclick='DownloadCheckList();' title='Save checkmarked words to file'>⏬ Download</a></br>
+    <a href='#' onclick='pasteUniqueWords();' title='Paste Unique words - new words are checked'>⭐ Paste Unique</a></br>
+    </div>
+  </div>
+  <div class='dropdown'>
+    <button class='dropbtn'>✅Checkmark</button>
+    <div class='dropdown-content'>
+    <a href='#' onclick='ClearCheckListUser();' title='Remove check from all words'>⬜Clear All</a></br>
+    <a href='#' onclick='CheckAllList();' title='Check all words'>✅Set All</a></br>
+    <a href='#' onclick='InvertCheckList();' title='Toggle check for all words'>🔵Invert</a></br>
+    <a href='#' onclick='CheckNotes();' title='Check all words that have some text in the note field'>🔤Check Notes</a></br>
+    </div>
+  </div>
 
-<p>
-<button onclick='updateListByField(); window && window.scroll(0,0)'>TOP</button>
-<button onclick='updateListNext(); window && window.scroll(0,0)'>Next</button>
-</p>
-<table width="100%" border=1>
-  <tr>
-    <td width='22%' id='CheckDragDrop' align='left'>
-        <b><span id='CheckListCount'><span style='background-color:cyan;'>Drag-and-drop CheckList .txt here</span></span></b>
-        <button onclick='pasteUniqueWords();' title='Paste unique words'>Paste Unique</button></br>
-    </td>
-    <td>
-      <button onclick='DownloadCheckList();' title='Save CheckList word file'>Download</button> &bull;
-      <button onclick='ClearCheckListUser();' title='Remove check from all words'>Clear All</button> &bull;
-      <button onclick='InvertCheckList();' title='Toggle check for all words'>Invert</button> &bull;
-      <button onclick='CheckNotes();' title='Check all words that have some text in the note field'>Check Notes</button> &bull;
-      <button onclick='RemoveUnchecked();' title='Remove all words that are NOT checked (cannot be undone!)'>Delete Unchecked</button></br>
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <a href='javascript:void(0)' onclick='toggleVisibilityLabel(languageProperties, hrefLanguageProperties); return false;' id='hrefLanguageProperties'>
-        Show HarfBuzz Operations
-      </a>
-    </td>
-    <td>
-      <div id='languageProperties' hidden>
-      <table border=1>
-        <tr><th>HTML Lang:</th><td><input type='text' id='HTMLLang' oninput='updateLanguage();' title='Web page language ID'/></td></tr>
-        <tr><th>HarfBuzz Script:</th><td><input type='text' id='HBScript' oninput='updateLanguage();' title='HarfBuzz script tag (4 character). e.g. "arab"'/></td></tr>
-        <tr><th>HarfBuzz Lang:</th><td><input type='text' id='HBLang' oninput='updateLanguage();' title='HarfBuzz language tag (4 character)'/></td></tr>
-       <tr><td align='right'>Progress:</td><td><div id='statusUpdate'>-</div> <button onclick='AbortProgress();' id='AbortButton' hidden>Abort!</button></td>
+  <div class='dropdown'>
+    <button class='dropbtn'>🔍Search</button>
+    <div class='dropdown-content'>
+      <table border=0 width='100%'>
+        <tr><th>Field:</th><td>
+          <input type='radio' name='regExpField' value='notes' checked><label for='notes'>Notes</label></br>
+          <input type='radio' name='regExpField' value='word'><label for='word'>Word</label></br>
+        </td></tr>
+        <tr><th>Regular Expression:</th><td><input type='text' name='regExpression' id='regExpression'/>
+          ^=start, $=end, \=escape
+        </td></tr>
+        <tr><th>Checkmark:</th><td>
+          <input type='radio' name='regExpOp' value='check' checked><label for='check'>Check</label></br>
+          <input type='radio' name='regExpOp' value='uncheck'><label for='uncheck'>Uncheck</label></br>
+          <input type='radio' name='regExpOp' value='invert'><label for='invert'>Invert</label>          
+        </td></tr>
+        <tr><th></th><td>
+          <button onclick='CheckmarkRegExp();' title='Run regular expression and adjust checkmark'>Search</button>
+        </td></tr>
       </table>
-      </br>
-      <table border=1>
+    </div>
+  </div>
+
+  <div class='dropdown'>
+    <button class='dropbtn'>&#x1F30D;HarfBuzz</button>
+    <div class='dropdown-content'>
+      <table border=0 width='100%'>
+        <tr><th>HTML Lang:</th><td><input type='text' id='HTMLLang' oninput='updateLanguage();' title='Web page language ID'/></td></tr>
+        <tr><th>Script:</th><td><input type='text' id='HBScript' oninput='updateLanguage();' title='HarfBuzz script tag (4 character). e.g. "arab"'/></td></tr>
+        <tr><th>Language:</th><td><input type='text' id='HBLang' oninput='updateLanguage();' title='HarfBuzz language tag (4 character)'/></td></tr>
         <tr>
           <th><button onclick='CheckSimilar();' title='Check all words where HarfBuzz output is the same (Compare GIDs is considered)'>Compare and Check</button></th>
           <td>
@@ -503,17 +548,59 @@ function updateAlign() {
             </table>
           </td>
         </tr>
-      </table>
-      </br>
-      <table border=1>
         <tr>
           <th><button onclick='UpdateDifferences();' title='Regression test:&#13;&#10;For each word where HarfBuzz differs between Font#1 and Font#2 -> toggle the check mark.&#13;&#10;&#13;&#10;Words left checkmarked will be:&#13;&#10;• requested changes that did not occur&#13;&#10;• unexpected changes'>Update Differences</button></th>
           <td><input type='checkbox' id='HBGIDs' oninput='updateLanguage();' title='Unchecked = ignore glyph ID when comparing; Checked = compare glyph ID in HarfBuzz output'>Compare GIDs</input></td>
         </tr>
       </table>
-      </div>
+    </div>
+  </div>      
+
+  <div class='dropdown'>
+    <button class='dropbtn'>❌Delete</button>
+    <div class='dropdown-content'>
+    <a href='#' onclick='RemoveUnchecked();' title='Remove all words that are NOT checked (cannot be undone!)'>❌Delete Unchecked</a></br>
+    <a href='#' onclick='DeleteAll();' title='Remove all words (cannot be undone!)'>⛔Delete All</a></br>
+    </div>
+  </div>
+<!-- Menus End -->
+
+<table border=2 cellspacing="8px" width='100%' id='word_list'>
+  <tr>
+    <th width='16%'>
+      # / Note
+    </th>
+    <th width='6%'>
+      <!--<a href='javascript:void(0)' onclick='toggleHBIcons();'>Diff</a>-->
+      Diff
+      <div class='dropdown'>
+        <button class='dropbtn'>&nbsp;?&nbsp;</button>
+        <div class='dropdown-content'>
+        <div id='HBIcons' hidden>
+        </div>
+      </div></div>
+    </th>
+    <th width='26%' id='fontOneInfo'>Drag-and-Drop Font 1</th>
+    <th width='26%' id='fontTwoInfo'>Drag-and-Drop Font 2</th>
+    <th width='26%'>Overlap</th>
+  </tr>
+</table>
+
+</p>
+
+<p>
+<button onclick='updateListByField(); window && window.scroll(0,0)'>TOP</button>
+<button onclick='updateListNext(); window && window.scroll(0,0)'>Next</button>
+</p>
+<table width="100%" border=1>
+  <tr>
+    <td width='22%' id='CheckDragDrop' align='left'>
+        <b><span id='CheckListCount'><span style='background-color:cyan;'>Drag-and-drop CheckList .txt here</span></span></b>
+    </td>
+    <td>
     </td>
   </tr>
+   <tr><td align='right'>Progress:</td><td><div id='statusUpdate'>-</div> <button onclick='AbortProgress();' id='AbortButton' hidden>Abort!</button></td>
 </table>
 </p>
 
@@ -723,7 +810,7 @@ function toggleVisibilityLabel(ele, href) {
 }
 
 function toggleHBIcons() {
-  HBIcons.innerHTML = '</br><p align="left">'+
+  HBIcons.innerHTML = '<p align="left">'+
     hb_icons.identical[0] + 'exact</br>'+
     //hb_icons.gid[0]       + 'gids</br>'+
     hb_icons.count[0]     + 'count</br>'+
@@ -762,15 +849,82 @@ function ClearCheckListUser() {
   updateListByField();
 }
 
-function InvertCheckList() {
+function CheckAllList() {
+  if (checkListChanged) {
+    if (!window.confirm('Check List has changed! Set all?')) return;
+  }
   var i = 0;
   while (i < wordList.length) {
-    wordList[i].setChecked(!wordList[i].getChecked());
+    wordList[i].setChecked(true);
     i++;
   }
   updateCheckListCount();
   checkListHasChanged();
   updateListByField();
+}
+
+function InvertCheckList() {
+  const size = wordList.length;
+  for (let i=0; i<size; i++) {
+    wordList[i].setChecked(!wordList[i].getChecked());
+  }
+  updateCheckListCount();
+  checkListHasChanged();
+  updateListByField();
+}
+
+function GetRadioValue(id) {
+  const radios = document.getElementsByName(id);
+  for (var i=0, rl=radios.length; i<rl; i++) {
+    if (radios[i].checked) {
+      return radios[i].value;
+    }
+  }
+  return null;
+}
+
+function CheckmarkRegExp() {
+  const exp = regExpression.value;
+  const opField = GetRadioValue('regExpField');
+  const opNotes = (opField === 'notes');
+
+  const opType = GetRadioValue('regExpOp');
+  const opCheck = (opType === 'check');
+  const opUncheck = (opType === 'uncheck');
+  const opInvert = (opType === 'invert');
+  var re;
+
+  try {
+    re = new RegExp(exp);
+  } catch (e) {
+    window.alert(e.message);
+    return;
+  }
+
+  var count = 0;
+
+  const size = wordList.length;
+  for (let i=0; i<size; i++) {
+    const we = wordList[i];
+    var txt;
+    if (opNotes)
+      txt = we.getNote();
+    else
+      txt = we.getWord();
+    if (re.test(txt)) {
+      count++;
+      if (opCheck)
+        wordList[i].setChecked(true);
+      else if (opUncheck)
+        wordList[i].setChecked(false);
+      else if (opInvert)
+        wordList[i].setChecked(!we.getChecked());
+    }
+  }
+  updateCheckListCount();
+  checkListHasChanged();
+  updateListByField();
+  window.alert('Found '+count+' matches');
 }
 
 var AbortTheLoop = false;
@@ -993,6 +1147,15 @@ function RemoveUnchecked() {
     }
   }
   doUntil(loop, stopCondition, yieldCondition);
+}
+
+function DeleteAll() {
+  if (!window.confirm('Delete all words?\r\nCannot be undone!!!')) return;
+  wordList = [];
+  UpdateWordCount();
+  updateCheckListCount();
+  updateListByIndex(1);
+  updateStatusMessage(-1);
 }
 
 // See: https://github.com/MattMatic/unique-words
@@ -1374,6 +1537,6 @@ patchDragDrop(fontTwoInfo, handleFontTwoDrop);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-06-16</p>
+</br>Tool Version: 2025-06-18</p>
 </body>
 </html>
