@@ -437,7 +437,13 @@ function updateAlign() {
       <button onclick='clearLocalStorage();' title='Reset and Clear'>Reset</button>
       &bull;
       <button onclick='openFontCompareTool();' title='Open HarfBuzz Font Compare Tool'>HarfBuzz Font Compare sync</button>
-      </br>
+
+      <div class='dropdown'>
+        <!--<button class='dropbtn'></button>-->
+        <div class='dropdown-content' id='ddProgress'>
+          <table border=0 width='100%'><tr><th>Progress:</th><td><div id='statusUpdate'>-</div> <button onclick='AbortProgress();' id='AbortButton' hidden>Abort!</button></td></tr></table>
+        </div>
+      </div>
     </td>
   </tr>
 </table>
@@ -472,7 +478,7 @@ function updateAlign() {
 <!-- Menus Start -->
   <div class='dropdown'>
     <button class='dropbtn'>🔤Word List</button>
-    <div class='dropdown-content'>
+    <div class='dropdown-content' id='ddWordList'>
     <a href='#' onclick='DownloadCheckList();' title='Save checkmarked words to file'>⏬Download</a></br>
     <a href='#' onclick='SortWordList();' title='Sort the word list'>📊Sort</a></br>
     <a href='#' onclick='pasteUniqueWords();' title='Paste Unique words - new words are checked'>⭐Paste Unique</a></br>
@@ -570,7 +576,7 @@ function updateAlign() {
 <table border=2 cellspacing="8px" width='100%' id='word_list'>
   <tr>
     <th width='16%'>
-      # / Note
+      # / Note</br><span style='font-size:75%' id='CheckListCount'></span>
     </th>
     <th width='6%'>
       <!--<a href='javascript:void(0)' onclick='toggleHBIcons();'>Diff</a>-->
@@ -597,12 +603,11 @@ function updateAlign() {
 <table width="100%" border=1>
   <tr>
     <td width='22%' id='CheckDragDrop' align='left'>
-        <b><span id='CheckListCount'><span style='background-color:cyan;'>Drag-and-drop CheckList .txt here</span></span></b>
+        <b><span style='background-color:cyan;'>Drag-and-drop CheckList .txt here</span></b>
     </td>
     <td>
     </td>
   </tr>
-   <tr><td align='right'>Progress:</td><td><div id='statusUpdate'>-</div> <button onclick='AbortProgress();' id='AbortButton' hidden>Abort!</button></td>
 </table>
 </p>
 
@@ -784,7 +789,6 @@ function findWordInList(theList, theWord, cache)
     return -1;
   }
   if (!cache._filled) {
-    console.log('filling cache', theList);
     const size = theList.length;
     for (let i=0; i<size; i++) {
       const word = theList[i].getWord();
@@ -792,7 +796,6 @@ function findWordInList(theList, theWord, cache)
         cache[word] = i;
     }
     cache._filled = true;
-    console.log('cache', size, cache);
   }
   const ce = cache[theWord];
   if (ce === undefined)
@@ -956,6 +959,7 @@ var AbortTheLoop = false;
 function AbortReset() {
   AbortTheLoop = false;
   AbortButton.hidden = false;
+  ddProgress.style.display = 'block';
 }
 
 function AbortProgress() {
@@ -978,6 +982,7 @@ function doUntil(loop, stopCondition, yieldCondition) {
             // Resolve promise, exit outer loop,
                         // and do not re-enter
             AbortButton.hidden = true;
+            ddProgress.style.display = '';
             resolve();
             break;
         } else if (yieldCondition()) {
@@ -1096,6 +1101,8 @@ function CheckNotes() {
     }
     i++;
   }
+  if (count > 0)
+    checkListHasChanged();
   updateListByIndex(1);
   updateCheckListCount();
   window.scroll(0,0);
@@ -1193,7 +1200,6 @@ function DeleteDuplicates() {
     const wei = findWordInList(res, we.getWord(), cache);
     if (wei >= 0) {
       // already there. Check the notes and checkmark
-      console.log('duplicate ',wei, we); //!!!!
       res[wei].setChecked(res[wei].getChecked() || we.getChecked());
       const note = we.getNote();
       if (note !== '') {
@@ -1466,7 +1472,7 @@ function setLastFontDetails(root, id) {
 }
 
 function loadFromLocalStorage() {
-  console.log('loadFromLocalStorage');//!!!!
+  //console.log('loadFromLocalStorage');//!!
   const ls = window.localStorage;
   var _wl = ls.getItem('wordList');
   wordlist_filename = ls.getItem('wordListFilename');
@@ -1625,6 +1631,6 @@ patchDragDrop(fontTwoInfo, handleFontTwoDrop);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-06-18</p>
+</br>Tool Version: 2025-06-18.o</p>
 </body>
 </html>
