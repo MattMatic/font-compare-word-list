@@ -1176,7 +1176,7 @@ function RemoveUnchecked() {
     }
     if (stopCondition()) {
       wordList = newWordList; // Assign the new updated list
-      if (typeof wordlist_filename !== 'undefined') {
+      if (typeof wordlist_filename === 'string') {
         if (!wordlist_filename.endsWith('(edited)')) wordlist_filename = wordlist_filename + ' (edited)';
       }
       UpdateWordCount();
@@ -1514,7 +1514,7 @@ updateListByIndex(1)
 function UpdateWordCount() {
   var wlc = document.getElementById('wordcount');
   var txt = 'Count:'+wordList.length;
-  if (typeof wordlist_filename !== 'undefined') {
+  if (typeof wordlist_filename === 'string') {
     txt = txt + ' '+wordlist_filename;
   }
   wlc.innerHTML = txt;
@@ -1631,6 +1631,6 @@ patchDragDrop(fontTwoInfo, handleFontTwoDrop);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-06-18.o</p>
+</br>Tool Version: 2025-06-18.p</p>
 </body>
 </html>
