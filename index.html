@@ -102,9 +102,9 @@ th .dropdown-content{
 }
 </style>
 
-<script type="text/javascript" src="hb.js"></script> <!-- Module - REQUIRED -->
-<script type="text/javascript" src="hbjs.js"></script> <!-- Wrapper, can be used without -->
-<script type="text/javascript" src="fontname.min.js"></script>
+<script type="text/javascript" src="./js/hb.js"></script> <!-- Module - REQUIRED -->
+<script type="text/javascript" src="./js/hbjs.js"></script> <!-- Wrapper, can be used without -->
+<script type="text/javascript" src="./js/fontname.min.js"></script>
 <script>
 "use strict";
 
@@ -440,6 +440,16 @@ function updateListPrev() {
   updateListByIndex(start_index);
 }
 
+function updateListFirst() {
+  start_index = 1;
+  updateListByIndex(start_index);
+}
+
+function updateListLast() {
+  start_index = wordList.length - per_block + 1;
+  updateListByIndex(start_index);
+}
+
 function updateCssStyle(name, styleid, value) {
   const rules = document.styleSheets[0].cssRules;
   for (var i=0, rl=rules.length; i<rl; i++) {
@@ -482,7 +492,6 @@ function updateAlign() {
       <button id='saveButton' onclick='saveToLocalStorage();' disabled=true title='Save state in localStorage'>Save</button>
       &bull;
       <button onclick='clearLocalStorage();' title='Reset and Clear'>Reset</button>
-      &bull;
 
       <div class='dropdown'>
         <!--<button class='dropbtn'></button>-->
@@ -501,8 +510,10 @@ function updateAlign() {
       <button onclick='gotoOrFind();' title='Jump to "Start" as a line number, or &#13;&#10; search for the text in "Start"'>Go</button>
     </td>
     <td width='26%' align='center'>
+      <button onclick='updateListFirst();' accesskey='1'>First (Alt-1)</button>
       <button onclick='updateListPrev();' accesskey='2'>Prev (Alt-2)</button>
       <button onclick='updateListNext();' accesskey='3'>Next (Alt-3)</button>
+      <button onclick='updateListLast();' accesskey='4'>Last (Alt-4)</button>
     </td>
     <td width="26%" id='WordsDragDrop' align='center'>
       <span id='wordcount'><b><span style='background-color:cyan;'>Drag-and-drop Word List (.txt) file here</b></span></span>
