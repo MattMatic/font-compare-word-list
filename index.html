@@ -287,6 +287,44 @@ function diffValueToNote(existingNote, diff) {
   return res + diffValueToUnicode(diff);
 }
 
+var tolCompare;
+
+function generateToleranceCompareFunction(tolerance) {
+  var fn;
+  if (tolerance && (tolerance !== '')) {
+    if (tolerance.includes('%')) {
+      const tol = parseFloat(tolerance) / 100;
+      fn = function(a, b) {
+        if ((Math.abs(a-b) / ((a+b)/2)) > tol) {
+          return true;
+        }
+        return false;
+      }
+    } else {
+      const diff = parseFloat(tolerance);
+      fn = function(a,b) {
+        if (Math.abs(a-b) > diff) return true;
+        return false;
+      }
+    }
+  } else {
+    fn = function(a,b) {
+      if (a !== b)
+        return true;
+      else
+        return false;
+    }
+  }
+  return fn;
+}
+
+tolCompare = generateToleranceCompareFunction(null);
+
+function updateTolerance() {
+  var tolerance = HBCC_tolerance.value;
+  tolCompare = generateToleranceCompareFunction(tolerance);
+}
+
 function addEntry(lineNo, theWordEntry, displayValue) {
   //if (txt == '') return;
   var table = document.getElementById('word_list');
@@ -296,7 +334,7 @@ function addEntry(lineNo, theWordEntry, displayValue) {
   var phrase = theWordEntry.getWord();
   hbf1.shape(phrase);
   hbf2.shape(phrase);
-  var diff = hbf1.compare(hbf2);
+  var diff = hbf1.compare(hbf2, tolCompare);
   theWordEntry.setDiff(diff);
 
   row.insertCell(0).innerHTML = '<div align="center">'+(lineNo+1)+
@@ -564,6 +602,9 @@ function updateAlign() {
                 <td><input type='checkbox' id='HBCC_identical' checked>✅Exact</input></td>
                 <td align='right'><span id='HBCC_identical_no'></span></td>
               </tr>
+              <tr>
+                <td><label for='HBCC_tolerance'>Tolerance:</label><input type='text' id='HBCC_tolerance' oninput='updateTolerance();'></td>
+              </tr>
             </table>
           </td>
         </tr>
@@ -689,13 +730,18 @@ class hbFont {
     this.results.json = buffer.json(this.font);
     buffer.destroy();
   }
-  compare(hb2) {
+  compare(hb2, toleranceFunction) {
     // Returns bit field:
     // 1 = GID different
     // 2 = Cluster different
     // 4 = Offset different
     // 8 = Advance different (e.g. kerning)
     // 128 = different length
+    if (!toleranceFunction) {
+      toleranceFunction = function(a,b) {
+        return (a !== b);
+      }
+    }
     if ( (this.results === null) ||
          (this.results.json === null) ||
          (hb2.results === null) ||
@@ -727,10 +773,12 @@ class hbFont {
       }
       if (g1.g  !== g2.g)  res |= 1;
       if (g1.cl !== g2.cl) res |= 2;
-      if (g1.dx !== g2.dx) res |= 4;
-      if (g1.dy !== g2.dy) res |= 4;
-      if (g1.ax !== g2.ax) res |= 8;
-      if (g1.ay !== g2.ay) res |= 8;
+
+      if (toleranceFunction(g1.dx, g2.dx)) res |= 4;
+      if (toleranceFunction(g1.dy, g2.dy)) res |= 4;
+      if (toleranceFunction(g1.ax, g2.ax)) res |= 8;
+      if (toleranceFunction(g1.ay, g2.ay)) res |= 8;
+
       idx++;
     }
     return res;
@@ -1123,7 +1171,7 @@ function CheckSimilar() {
     var phrase = wordList[i].getWord();
     hbf1.shape(phrase);
     hbf2.shape(phrase);
-    var diff = hbf1.compare(hbf2);
+    var diff = hbf1.compare(hbf2, tolCompare);
     updateBitCounts(bit_counts, diff);
     if ((diff & bits) != 0) {
       wordList[i].setChecked(true);
@@ -1189,7 +1237,7 @@ function UpdateDifferences() {
     var phrase = wordList[i].getWord();
     hbf1.shape(phrase);
     hbf2.shape(phrase);
-    var diff = hbf1.compare(hbf2);
+    var diff = hbf1.compare(hbf2, tolCompare);
     const theSame = ((diff == 1) && checkGIDs) || (diff == 0);
     if (!theSame) {
       wordList[i].setChecked(!wordList[i].getChecked());
@@ -1728,6 +1776,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-06-26</p>
+</br>Tool Version: 2025-06-26 j</p>
 </body>
 </html>
