@@ -35,6 +35,9 @@
   text-align: center;
   line-height: 0px;
 }
+.note {
+  width: 60%;
+}
 
 input[type="text"] {
   font-size: 100%;
@@ -237,9 +240,9 @@ function NoteUpdate(e) {
 }
 
 function BuildNoteHtml(n) {
-  var txt = '<input type="text" onchange="NoteUpdate(this);" onkeyup="NoteUpdate(this);" name="note'+(n+1)+'" value="';
+  var txt = '<input type="text" class="note" onchange="NoteUpdate(this);" onkeyup="NoteUpdate(this);" name="note'+(n+1)+'" value="';
   txt = txt + wordList[n].getNote();
-  txt = txt + '" size=8>';
+  txt = txt + '">';
   return txt;
 }
 
@@ -284,7 +287,7 @@ function diffValueToNote(existingNote, diff) {
   return res + diffValueToUnicode(diff);
 }
 
-function addEntry(lineNo, theWordEntry) {
+function addEntry(lineNo, theWordEntry, displayValue) {
   //if (txt == '') return;
   var table = document.getElementById('word_list');
   var row = table.insertRow();
@@ -303,17 +306,23 @@ function addEntry(lineNo, theWordEntry) {
       theWordEntry.getDiff()+
       '</div>';
   row.insertCell(idx++).innerHTML = wordHTML(phrase, "test_1");
-  row.insertCell(idx++).innerHTML = wordHTML(phrase, "test_2");
-  row.insertCell(idx++).innerHTML =
+  var cell = row.insertCell(idx++);
+  cell.innerHTML = wordHTML(phrase, "test_2");
+  cell.style.display = displayValue;
+  cell = row.insertCell(idx++);
+  cell.innerHTML =
       //'<p style="line-height: 0px; " align="center">'
       '<p class="overlap">'
     + '<span class="test_2" style="color: #ff6600;">' + phrase + '</span><br>'
     + '<span class="test_1">' + phrase + '</span></p>'
+  cell.style.display = displayValue;
 }
+
 function updateListByIndex(idx) {
   hbf1.setScriptLang(HBScript.value, HBLang.value);
   hbf2.setScriptLang(HBScript.value, HBLang.value);
 
+  const displayValue = window.getComputedStyle(fontOverlap).display;
   var table = document.getElementById('word_list')
   var s = table.rows.length;
   while (s > 1) {
@@ -323,7 +332,7 @@ function updateListByIndex(idx) {
   var n =  per_block;
   for (var i=(idx-1); i < (idx-1+n); i++) {
     if (wordList[i] === undefined) break;
-    addEntry(i, wordList[i]);
+    addEntry(i, wordList[i], displayValue);
   }
   const e = document.getElementById('start');
   if (idx != e.value) {
@@ -436,7 +445,6 @@ function updateAlign() {
       &bull;
       <button onclick='clearLocalStorage();' title='Reset and Clear'>Reset</button>
       &bull;
-      <button onclick='openFontCompareTool();' title='Open HarfBuzz Font Compare Tool'>HarfBuzz Font Compare sync</button>
 
       <div class='dropdown'>
         <!--<button class='dropbtn'></button>-->
@@ -480,7 +488,8 @@ function updateAlign() {
     <button class='dropbtn'>🔤Word List</button>
     <div class='dropdown-content' id='ddWordList'>
     <a href='#' onclick='DownloadCheckList();' title='Save checkmarked words to file'>⏬Download</a></br>
-    <a href='#' onclick='SortWordList();' title='Sort the word list'>📊Sort</a></br>
+    <a href='#' onclick='SortWordList(false);' title='Sort the word list'>📊Sort by Word</a></br>
+    <a href='#' onclick='SortWordList(true);'  title='Sort the word list by note'>🗒Sort by Note</a></br>
     <a href='#' onclick='pasteUniqueWords();' title='Paste Unique words - new words are checked'>⭐Paste Unique</a></br>
     </div>
   </div>
@@ -491,6 +500,9 @@ function updateAlign() {
     <a href='#' onclick='CheckAllList();' title='Check all words'>✅Set All</a></br>
     <a href='#' onclick='InvertCheckList();' title='Toggle check for all words'>🔵Invert</a></br>
     <a href='#' onclick='CheckNotes();' title='Check all words that have some text in the note field'>🔤Check Notes</a></br>
+
+    <a href='#' onclick='openFontCompareTool();' title='Send check mark words to HarfBuzz Font Compare Tool'>📤> Font Compare</a></br>
+    <a href='#' onclick='openFontForceFieldTool();' title='Send check mark words to Font Force Field Tool'>📤> Force Field</a></br>
     </div>
   </div>
 
@@ -575,7 +587,7 @@ function updateAlign() {
 
 <table border=2 cellspacing="8px" width='100%' id='word_list'>
   <tr>
-    <th width='16%'>
+    <th width='16%' id='checkListHeading'>
       # / Note</br><span style='font-size:75%' id='CheckListCount'></span>
     </th>
     <th width='6%'>
@@ -589,8 +601,18 @@ function updateAlign() {
       </div></div>
     </th>
     <th width='26%' id='fontOneInfo'>Drag-and-Drop Font 1</th>
-    <th width='26%' id='fontTwoInfo'>Drag-and-Drop Font 2</th>
-    <th width='26%'>Overlap</th>
+    <th width='26%' id='fontTwoInfoCell'>
+      <span id='fontTwoInfo'>Drag-and-Drop Font 2
+      </span>
+      <div class='dropdown'>
+        <button class='dropbtn'>…</button>
+        <div class='dropdown-content'>
+          <button class='dropbtn' style='width:50%' onclick='showFontTwo(false);'>Hide</button></br>
+          <button class='dropbtn' style='width:50%' onclick='showFontTwo(true);'>Show</button>
+        </div>
+      </div>
+</th>
+    <th width='26%' id='fontOverlap'>Overlap</th>
   </tr>
 </table>
 
@@ -640,7 +662,7 @@ class hbFont {
     this.fontBlob = fb;
     if (fb) {
       const fontName = FontName.parse(fb)[0];
-      console.log(fontName);
+      //console.log(fontName);
       this.fileDescription = fontName.fullName + '</br>' + fontName.version;
     } else {
       this.fileDescription = '';
@@ -825,6 +847,42 @@ function checkBothFontsLoaded() {
     window.alert('Please load two fonts to compare');
   }
   return res;
+}
+
+function showHideColumn(colNo, doShow) {
+  var stl;
+  if (doShow)
+    stl = 'table-cell';
+  else
+    stl = 'none';
+  const rows = word_list.getElementsByTagName('tr');
+  const size = rows.length;
+  for (let row=1; row<size; row++) {
+    const cells = rows[row].getElementsByTagName('td');
+    cells[colNo].style.display = stl;
+  }
+}
+
+function showFontTwo(doShow) {
+  if (doShow) {
+    checkListHeading.style.width = '16%';
+    // diff = '6%'
+    fontOneInfo.style.width = '26%';
+    fontTwoInfoCell.style.width = '26%';
+    fontOverlap.style.width = '26%';
+    fontOverlap.hidden = false;
+    showHideColumn(3, true);
+    showHideColumn(4, true);
+  } else {
+    checkListHeading.style.width = '39%';
+    // diff = '6%'
+    fontOneInfo.style.width = '40%';
+    fontTwoInfoCell.style.width = '10%';
+    fontOverlap.style.width = '5%';
+    fontOverlap.hidden = true;
+    showHideColumn(3, false);
+    showHideColumn(4, false);
+  }
 }
 
 function toggleVisibilityLabel(ele, href) {
@@ -1221,18 +1279,32 @@ function DeleteDuplicates() {
   window.alert('Duplicates '+count);
 }
 
-function SortWordList() {
+function SortWordList(sortByNote) {
   if (!window.confirm('Sort word list?\r\nCannot be undone!!!')) return;
-  var compare = function(a,b) {
+  var compareWord = function(a,b) {
     const aw = a.getWord();
     const bw = b.getWord();
-    if (aw < bw)
-      return -1;
-    if (aw > bw)
-      return 1;
+    if (aw < bw) return -1;
+    if (aw > bw) return 1;
     return 0;
   }
-  wordList.sort(compare);
+  var compareNote = function(a,b) {
+    const aw = a.getNote();
+    const bw = b.getNote();
+    if (aw < bw) {
+      if (aw === '') return 1;
+      return -1;
+    }
+    if (aw > bw) {
+      if (bw === '') return -1;
+      return 1;
+    }
+    return compareWord(a, b);
+  }
+  if (sortByNote)
+    wordList.sort(compareNote);
+  else
+    wordList.sort(compareWord);
   UpdateWordCount();
   updateCheckListCount();
   updateListByIndex(1);
@@ -1327,9 +1399,10 @@ async function pasteUniqueWords() {
 }
 
 var hbfcw = null;
+var ffftw = null;
 var api = {};
 
-function openFontCompareTool() {
+function prepareApi() {
   api = {};
   api.transfer = {}
   api.transfer.script = HBScript.value;
@@ -1340,7 +1413,8 @@ function openFontCompareTool() {
   api.transfer.wordList = [];
   api.transfer.checkList = [];
   var i = 0;
-  while (i < wordList.length) {
+  const size = wordList.length;
+  while (i < size) {
     const word = wordList[i].word;
     if (wordList[i].getChecked()) {
       api.transfer.checkList.push(word);
@@ -1348,6 +1422,10 @@ function openFontCompareTool() {
     api.transfer.wordList.push(word);
     i++;
   }
+}
+
+function openFontCompareTool() {
+  prepareApi();
   if (!hbfcw || hbfcw.closed) {
     var hbfc_url;
     if (window.location.hostname === 'localhost')
@@ -1358,6 +1436,21 @@ function openFontCompareTool() {
   } else {
     hbfcw.updateTransfer(api.transfer);
     hbfcw.focus();
+  }
+}
+
+function openFontForceFieldTool() {
+  prepareApi();
+  if (!ffftw || ffftw.closed) {
+    var ffft_url;
+    if (window.location.hostname === 'localhost')
+      ffft_url = '../font-force-field/index.html';
+    else
+      ffft_url = 'https://mattmatic.github.io/font-force-field/index.html';
+    ffftw = window.open(ffft_url, 'mattmatic.font-force-field')
+  } else {
+    ffftw.updateTransfer(api.transfer);
+    ffftw.focus();
   }
 }
 
@@ -1498,6 +1591,7 @@ function loadFromLocalStorage() {
   }
   setLastFontDetails('1', fontOneInfo);
   setLastFontDetails('2', fontTwoInfo);
+  showFontTwo(false);
   //---- localStorage is very limited - cannot store the fontBlobs, alas
   //var _fontBlob1 = ls.getItem('fontBlob1');
   //if (_fontBlob1) applyFontX(null, 'Test_Font_1', fontOneInfo, hbf1, _fontBlob1);
@@ -1621,16 +1715,19 @@ function handleFontOneDrop(file) {
 
 function handleFontTwoDrop(file) {
   handleFontXDrop(file, 'Test_Font_2', fontTwoInfo, hbf2);
+  showFontTwo(true);
 }
 
 patchDragDrop(WordsDragDrop, handleWordsDrop);
 patchDragDrop(CheckDragDrop, handleCheckDrop);
 patchDragDrop(fontOneInfo, handleFontOneDrop);
-patchDragDrop(fontTwoInfo, handleFontTwoDrop);
+patchDragDrop(fontTwoInfoCell, handleFontTwoDrop);
+
+showFontTwo(false);
 
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-06-18.p</p>
+</br>Tool Version: 2025-06-26</p>
 </body>
 </html>
