@@ -105,9 +105,16 @@ th .dropdown-content{
 <script type="text/javascript" src="./js/hb.js"></script> <!-- Module - REQUIRED -->
 <script type="text/javascript" src="./js/hbjs.js"></script> <!-- Wrapper, can be used without -->
 <script type="text/javascript" src="./js/fontname.min.js"></script>
+<script type="text/javascript" src="./js/flatbezier.js"></script>
+<script type='module' src="./js/glyphcompare.mjs" async></script>
+<script type='module'>
+import {CPaths64, GlyphCompareClass} from './js/glyphcompare.mjs';
+window.CPaths64 = CPaths64;
+window.GlyphCompareClass = GlyphCompareClass;
+</script>
+
 <script>
 "use strict";
-
 
 function onResourcesLoaded() {
   loadFromLocalStorage();
@@ -115,6 +122,11 @@ function onResourcesLoaded() {
     acquireFontAndLists(window.opener);
   }
   toggleHBIcons();
+  /*
+  import('./js/glyphcompare.mjs').then((module) => {
+    GlyphCompare = module;
+  });
+  */
 }
 
 let harfBuzzModule; // not really needed with the hbjs wrapper
@@ -246,8 +258,20 @@ function BuildNoteHtml(n) {
   return txt;
 }
 
+function BuildDifference(n, phrase) {
+  if (!HBCGlive.checked) return '';
+  hbf1.shapeGlyphCompare(phrase);
+  hbf2.shapeGlyphCompare(phrase);
+  //??var diff = hbf1.compare(hbf2, tolCompare);
+  let diffs = hbf1.compareOverlap(hbf2);
+  if (!diffs) return '';
+  let duDiff = Math.round(diffs.fill) / 1000.0;
+  if (duDiff === 0) return '';
+  return duDiff;
+}
+
 const hb_icons = {
-  identical: ['&#x2705;' , '✅',   0],     // Green tick
+  identical: ['&#x2705;' , '✅',  64],     // Green tick
   count    : ['&#x1F7E5;', '🟥', 128],     // Red
   cluster  : ['&#x1F7E8;', '🟨',   2],     // Yellow
   advance  : ['&#x1F7E6;', '🟦',   8],     // Blue
@@ -259,7 +283,7 @@ const hb_icons = {
 function diffFieldToText(diff) {
   var res = '';
   if (diff < 0) return '';
-  if (diff == 0) return hb_icons.identical[0];
+  if ((diff == 0) || (diff === 64)) return hb_icons.identical[0];
   const sep = "";//</br>";
   if (0 != (diff & hb_icons.count[2]))    res = res + hb_icons.count[0]   + sep;
   if (0 != (diff & hb_icons.cluster[2]))  res = res + hb_icons.cluster[0] + sep;
@@ -272,7 +296,7 @@ function diffFieldToText(diff) {
 function diffValueToUnicode(diff) {
   var res = '';
   if (diff < 0) return res;
-  if (diff == 0) return hb_icons.identical[1];
+  if ((diff == 0) || (diff === 64)) return hb_icons.identical[1];
   if (0 != (diff & hb_icons.count[2])) res = res + hb_icons.count[1];
   if (0 != (diff & hb_icons.cluster[2]))   res = res + hb_icons.cluster[1];
   if (0 != (diff & hb_icons.advance[2]))   res = res + hb_icons.advance[1];
@@ -337,12 +361,15 @@ function addEntry(lineNo, theWordEntry, displayValue) {
   var diff = hbf1.compare(hbf2, tolCompare);
   theWordEntry.setDiff(diff);
 
-  row.insertCell(0).innerHTML = '<div align="center">'+(lineNo+1)+
-      BuildMarkHtml(lineNo)+' '+BuildNoteHtml(lineNo)+'</div>';
-  row.insertCell(idx++).innerHTML = '<div class="HBC">'+
+  row.insertCell(0).innerHTML = '<div align="center">'+(lineNo+1)
+      +BuildMarkHtml(lineNo)
+      +' '+BuildNoteHtml(lineNo)
+      +'</div>';
+  row.insertCell(idx++).innerHTML = '<div class="HBC">'
       //diffFieldToText(diff)+
-      theWordEntry.getDiff()+
-      '</div>';
+      +theWordEntry.getDiff()
+      +'</br>'+BuildDifference(lineNo, phrase)
+      +'</div>';
   row.insertCell(idx++).innerHTML = wordHTML(phrase, "test_1");
   var cell = row.insertCell(idx++);
   cell.innerHTML = wordHTML(phrase, "test_2");
@@ -614,7 +641,7 @@ function updateAlign() {
                 <td align='right'><span id='HBCC_identical_no'></span></td>
               </tr>
               <tr>
-                <td><label for='HBCC_tolerance'>Tolerance:</label><input type='text' id='HBCC_tolerance' oninput='updateTolerance();'></td>
+                <td><label for='HBCC_tolerance'>Tolerance:</label><input type='text' id='HBCC_tolerance' oninput='updateTolerance();' title='Tolerance for Offset & Advance&#13;&#10; - either a value in designUnits (e.g. 10), or a percentage (e.g. 10%)'></td>
               </tr>
             </table>
           </td>
@@ -622,6 +649,14 @@ function updateAlign() {
         <tr>
           <th><button onclick='UpdateDifferences();' title='Regression test:&#13;&#10;For each word where HarfBuzz differs between Font#1 and Font#2 -> toggle the check mark.&#13;&#10;&#13;&#10;Words left checkmarked will be:&#13;&#10;• requested changes that did not occur&#13;&#10;• unexpected changes'>Update Differences</button></th>
           <td><input type='checkbox' id='HBGIDs' oninput='updateLanguage();' title='Unchecked = ignore glyph ID when comparing; Checked = compare glyph ID in HarfBuzz output'>Compare GIDs</input></td>
+        </tr>
+        <tr>
+          <th><button onclick='CheckDifferentGlyphs();' title='Render the outlines and check any that have difference:area ratio too high'>Compare Outlines</button></th>
+          <td>
+            <font color='red'>EXPERIMENTAL</font></br>
+            <input type='text' id='HBCGtolerance' title='1000s designUnits^2 area tolerance' value='20'></input></br>
+            <input type='checkbox' id='HBCGlive' onchange='updateHBCGlive();'>Show in table</input>
+          </td>
         </tr>
       </table>
     </div>
@@ -696,12 +731,14 @@ class hbFont {
     this.results.json = null;
   }
   destroy() {
-    this.freeFontBlob();
+    this.freeFontBlob();    
   }
   freeFontBlob() {
     this.freeFont();
     this.fileDescription = null;
     delete(this.fontBlob);
+    if (this.gc) this.gc.destroy();
+    delete(this.gc);
   }
   freeFont() {
     this.results = {};
@@ -723,10 +760,17 @@ class hbFont {
     this.blob = hb.createBlob(this.fontBlob);
     this.face = hb.createFace(this.blob, 0);
     this.font = hb.createFont(this.face);
+
+    this.gc = new GlyphCompareClass();
+    this.gc.setFontBlob(this.fontBlob);
+    this.gc.setScriptLanguage(this.script, this.lang);
   }
   setScriptLang(script, lang) {
     this.script = script;
     this.lang = lang;
+
+    if (this.gc)
+      this.gc.setScriptLanguage(this.script, this.lang);
   }
   shape(txt) {
     if (!this.fontBlob) return;
@@ -738,8 +782,9 @@ class hbFont {
     if (this.lang && (this.lang.length > 0))
       buffer.setLanguage(this.lang);
     hb.shape(this.font, buffer, this.features);
-    this.results.json = buffer.json(this.font);
-    buffer.destroy();
+    const json = buffer.json(this.font);
+    this.results.json = json;
+    buffer.destroy();    
   }
   compare(hb2, toleranceFunction) {
     // Returns bit field:
@@ -748,6 +793,7 @@ class hbFont {
     // 4 = Offset different
     // 8 = Advance different (e.g. kerning)
     // 128 = different length
+    // 64  = exact
     if (!toleranceFunction) {
       toleranceFunction = function(a,b) {
         return (a !== b);
@@ -792,7 +838,19 @@ class hbFont {
 
       idx++;
     }
+    if (res === 0) res |= 64;
     return res;
+  }
+  shapeGlyphCompare(txt) {
+    if (!this.gc) return;
+    let json = this.gc.shape(txt, this.features);
+    this.gc.toPath(json);
+  }
+  compareOverlap(hb2) {
+    if (!this.gc) return undefined;
+    if (!hb2.gc) return undefined;
+    let overlap = this.gc.overlapArea(hb2.gc);
+    return overlap;
   }
 }
 
@@ -973,6 +1031,8 @@ function triCb(cb) {
 // Update the document language tag, and the HarfBuzz values
 function updateLanguage() {
   document.documentElement.setAttribute('lang', HTMLLang.value);
+  hbf1.setScriptLang(HBScript.value, HBLang.value);
+  hbf2.setScriptLang(HBScript.value, HBLang.value);
 }
 
 function ClearCheckList() {
@@ -1121,11 +1181,11 @@ function doUntil(loop, stopCondition, yieldCondition) {
   });
 }
 
-function updateStatusMessage(i, total) {
+function updateStatusMessage(i, foundCount, total) {
   if (i <= 0)
     statusUpdate.innerHTML = '-';
   else
-    statusUpdate.innerHTML = '<div><font color="red">'+i + '/'+ total+'</font></div>';
+    statusUpdate.innerHTML = '<div><font color="red">'+i + '/'+ total+'</font></div></br>'+(foundCount ?? '')+' found';
 }
 
 function updateBitCountsOne(t, bits, v) {
@@ -1177,7 +1237,8 @@ function CheckSimilar() {
   hbf1.setScriptLang(HBScript.value, HBLang.value);
   hbf2.setScriptLang(HBScript.value, HBLang.value);
 
-  updateStatusMessage(i, total);
+  var checkCount = 0;
+  updateStatusMessage(i, checkCount, total);
   const loop = () => {
     var phrase = wordList[i].getWord();
     hbf1.shape(phrase);
@@ -1186,11 +1247,12 @@ function CheckSimilar() {
     updateBitCounts(bit_counts, diff);
     if ((diff & bits) != 0) {
       wordList[i].setChecked(true);
+      checkCount++;
     }
     wordList[i].setDiff(diff);  // Update the difference field
     i++;
     if (yieldCondition()) {
-      updateStatusMessage(i, total);
+      updateStatusMessage(i, checkCount, total);
       mapCountsToDisplay(bit_counts);
     }
     if (stopCondition()) {
@@ -1204,6 +1266,60 @@ function CheckSimilar() {
     }
   }
 
+  doUntil(loop, stopCondition, yieldCondition);
+}
+
+function updateHBCGlive() {
+  updateListByIndex(start_index);
+}
+
+function CheckDifferentGlyphs() {
+  let i = 0;
+  const total = wordList.length;
+
+  if (!checkBothFontsLoaded()) return;
+  if (total > 5000) {
+    if (!window.confirm('This will take a long, LONG time. Continue?')) return;
+  }
+
+  const stopCondition = () => (i >= total) || AbortTheLoop;
+  const yieldCondition = () => i % update_interval == 0;
+
+  hbf1.setScriptLang(HBScript.value, HBLang.value);
+  hbf2.setScriptLang(HBScript.value, HBLang.value);
+
+  const tolerance = parseFloat(HBCGtolerance.value) * 1000.0;
+
+  let checkCount = 0;
+  updateStatusMessage(i, checkCount, total);
+  const loop = () => {
+    var phrase = wordList[i].getWord();
+    hbf1.shapeGlyphCompare(phrase);
+    hbf2.shapeGlyphCompare(phrase);
+    //??var diff = hbf1.compare(hbf2, tolCompare);
+    let diffs = hbf1.compareOverlap(hbf2);
+    console.log('diffs', phrase, diffs);
+
+    if (diffs) {
+      if (diffs.fill >= tolerance) {
+        wordList[i].setChecked(true);
+        checkCount++;
+      }      
+    }
+
+    i++;
+    if (yieldCondition()) {
+      updateStatusMessage(i, checkCount, total);
+    }
+    if (stopCondition()) {
+      checkListHasChanged();
+      updateCheckListCount();
+      UpdateWordCount();
+      updateListByIndex(1);
+      window.scroll(0,0);
+      updateStatusMessage(-1);
+    }
+  }
   doUntil(loop, stopCondition, yieldCondition);
 }
 
@@ -1243,19 +1359,21 @@ function UpdateDifferences() {
   hbf1.setScriptLang(HBScript.value, HBLang.value);
   hbf2.setScriptLang(HBScript.value, HBLang.value);
 
-  updateStatusMessage(i, total);
+  let checkCount = 0;
+  updateStatusMessage(i, checkCount, total);
   const loop = () => {
     var phrase = wordList[i].getWord();
     hbf1.shape(phrase);
     hbf2.shape(phrase);
     var diff = hbf1.compare(hbf2, tolCompare);
-    const theSame = ((diff == 1) && checkGIDs) || (diff == 0);
+    const theSame = ((diff == 1) && checkGIDs) || (diff == 0) || (diff == 64);
     if (!theSame) {
       wordList[i].setChecked(!wordList[i].getChecked());
+      checkCount++;
     }
     i++;
     if (yieldCondition()) {
-      updateStatusMessage(i, total);
+      updateStatusMessage(i, checkCount, total);
     }
     if (stopCondition()) {
       checkListHasChanged();
@@ -1285,11 +1403,11 @@ function RemoveUnchecked() {
     if (wle.getChecked()) {
       newWordList.push(wle);
     } else {
-      deletedCount++;
+      deletedCount++;      
     }
     i++;
     if (yieldCondition()) {
-      updateStatusMessage(i, size);
+      updateStatusMessage(i, deletedCount, size);
     }
     if (stopCondition()) {
       wordList = newWordList; // Assign the new updated list
@@ -1787,6 +1905,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-06-26 j</p>
+</br>Tool Version: 2025-06-07j</p>
 </body>
 </html>
