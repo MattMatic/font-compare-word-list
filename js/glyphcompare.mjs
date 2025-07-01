@@ -216,6 +216,13 @@ export class CPaths64 {
     obj.setPaths64(res);
     return obj;
   }
+  xorToNewCPaths64(cp) {
+    const { Difference64, Xor64, FillRule, Union64FillRule } = Clipper2Z;
+    var res = Xor64(this.paths64, cp.paths64, FillRule.NonZero);
+    var obj = new CPaths64();
+    obj.setPaths64(res);
+    return obj;
+  }
   // Count the positive paths in the set
   // (Used for finding 'far' glyphs)
   countIslands() {
@@ -448,8 +455,13 @@ export class GlyphCompareClass {
   getArea() {
     return this.cpaths64.getArea().fill;
   }
+  overlapToCPaths64(glyphCompareClassOther) {
+    //let diff = this.cpaths64.differenceToNewCPaths64(glyphCompareClassOther.cpaths64);
+    let diff = this.cpaths64.xorToNewCPaths64(glyphCompareClassOther.cpaths64);
+    return diff;
+  }
   overlapArea(glyphCompareClassOther) {
-    let diff = this.cpaths64.differenceToNewCPaths64(glyphCompareClassOther.cpaths64);
+    let diff = this.overlapToCPaths64(glyphCompareClassOther);
     if (!diff) return undefined;
     let res = diff.getArea();
     let area = this.cpaths64.getArea();

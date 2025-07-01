@@ -100,6 +100,13 @@ th .dropdown-content{
   background-color: #3e8e41;
   color: white;
 }
+.vectors {
+  position: fixed;
+  display: none;
+  background-color: #eff;
+  min-width: 600px;
+  z-index: 0;
+}
 </style>
 
 <script type="text/javascript" src="./js/hb.js"></script> <!-- Module - REQUIRED -->
@@ -377,7 +384,7 @@ function addEntry(lineNo, theWordEntry, displayValue) {
   cell = row.insertCell(idx++);
   cell.innerHTML =
       //'<p style="line-height: 0px; " align="center">'
-      '<p class="overlap">'
+      '<p class="overlap" id="overlap'+lineNo+'">'
     + '<span class="test_2" style="color: #ff6600;">' + phrase + '</span><br>'
     + '<span class="test_1">' + phrase + '</span></p>'
   cell.style.display = displayValue;
@@ -398,6 +405,27 @@ function updateListByIndex(idx) {
   for (var i=(idx-1); i < (idx-1+n); i++) {
     if (wordList[i] === undefined) break;
     addEntry(i, wordList[i], displayValue);
+  }
+  // Patch in the mouse hover action
+  for (let i=(idx-1); i<(idx-1+n); i++) {
+    if (wordList[i] === undefined) break;
+    let ele = document.getElementById('overlap'+i);
+    if (ele) {
+      ele.addEventListener(
+        "mouseenter",
+        (event) => {
+          showOverlap(wordList[i].getWord(), i+1, event);
+        },
+        false,
+      );
+      ele.addEventListener(
+        "mouseleave",
+        (event) => {
+          hideOverlap(event);
+        },
+        false,
+      );
+    }
   }
   const e = document.getElementById('start');
   if (idx != e.value) {
@@ -671,6 +699,9 @@ function updateAlign() {
     </div>
   </div>
 <!-- Menus End -->
+<div class='vectors' id='vectorDisplay'>
+<div id="svgResult"></div>
+</div>
 
 <table border=2 cellspacing="8px" width='100%' id='word_list'>
   <tr>
@@ -721,6 +752,33 @@ function updateAlign() {
 </p>
 
 <script>
+
+function isExists(v) {
+  if ((typeof(v) === 'object') && (v === null)) return false;
+  return typeof(v) !== 'undefined';
+}
+
+function isAssigned(obj) {
+  if (typeof obj === 'undefined') return false;
+  if (obj === null) return false;
+  return true;
+}
+
+function updateSvg(dive, html) {
+  var oldScale = 1;
+  var oldTranslate = {x:0, y:0};
+
+  var svge = dive.children[0];
+  if (typeof svge !== 'undefined') {
+    oldScale = svge.currentScale;
+    oldTranslate = svge.currentTranslate;
+  }
+  dive.innerHTML = html;
+  svge = dive.children[0];
+  svge.currentScale = oldScale;
+  svge.currentTranslate.x = oldTranslate.x;
+  svge.currentTranslate.y = oldTranslate.y;
+}
 
 class hbFont {
   constructor() {
@@ -851,6 +909,85 @@ class hbFont {
     if (!hb2.gc) return undefined;
     let overlap = this.gc.overlapArea(hb2.gc);
     return overlap;
+  }
+  genSVGPath(p64, settings) {
+    const size = p64.size();
+    for (let i=0;i<size;i++) {
+      const point = p64.get(i);
+      const x= Number(point.x) *  1;
+      const y= Number(point.y) * -1;
+      if (i==0)
+        this.svgData += `M${x},${y}`;
+      else
+        this.svgData += `L${x},${y}`;
+      point.delete(); //??
+    }
+    this.svgData += 'z';
+  }
+  genSVGPaths(ps64, settings) {
+    if (!isAssigned(ps64)) return;
+    settings = settings || {};
+    if (!isExists(settings.mixBlendMode)) settings.mixBlendMode = 'normal';
+    this.svgData += '<path ';
+    if (settings.id) {
+      this.svgData += `id="${settings.id}" `;
+    }
+    this.svgData += ' style="';
+    if (isExists(settings.fillColor)) {
+      if (!isExists(settings.fillOpacity)) settings.fillOpacity = 0.5;
+      this.svgData += 'fill:'+settings.fillColor
+                    +';fill-opacity:'+settings.fillOpacity
+    } else {
+      this.svgData += ';fill-opacity:0';
+    }
+    if (isExists(settings.strokeColor)) {
+      if (!isExists(settings.strokeOpacity)) settings.strokeOpacity = 1.0;
+      if (!isExists(settings.strokeWidth)) settings.strokeWidth = 2;
+      this.svgData += ';stroke:'+settings.strokeColor
+                    +';stroke-opacity:'+settings.strokeOpacity
+                    +';stroke-width:'+settings.strokeWidth
+                    +';stroke-linejoin=\'round\''
+    }
+    if (settings.mixBlendMode !== 'normal')
+      this.svgData +=';mix-blend-mode:\''+settings.mixBlendMode+'\''
+    
+    this.svgData += '" d="';
+    const size = ps64.size();
+    for (let i=0;i<size;i++) {
+      const path = ps64.get(i);
+      this.genSVGPath(path, settings);
+      path.delete();
+    }
+    this.svgData += '"/>\r\n';
+    return this.svgData;
+  }
+  genSVGcombined(txt, hb2, hideOverlap) {
+    this.svgData = '';
+    let svg = '';
+    let jsonThis = this.gc.shape(txt, this.features);
+    let p64This = this.gc.toPath(jsonThis);
+    let jsonThat = hb2.gc.shape(txt, this.features);
+    let p64That = hb2.gc.toPath(jsonThat);
+    const fopac = hideOverlap ? 1.0 : 0.25;
+    if (!hideOverlap) {
+      let p64Overlap = this.gc.overlapToCPaths64(hb2.gc);
+      svg += this.genSVGPaths(p64Overlap.paths64, {strokeColor:'#f08', strokeWidth:9, strokeOpacity:1, fillColor:'#f08', fillOpacity:1});
+      p64Overlap.destroy();
+    }
+    svg += this.genSVGPaths(p64That.paths64, {fillColor:'#e60', fillOpacity:fopac});
+    svg += this.genSVGPaths(p64This.paths64, {fillColor:'#008', fillOpacity:fopac});
+    const xmin = -250;
+    const ymin = -1800;
+    const height = 3000;
+    const heightOut = 400;
+    const width = 800 /*(window.innerWidth)*/ * height / heightOut * 0.95;
+    var bbox = xmin + ' ' + ymin + ' ' +width + ' ' + height;
+
+    svg = '<svg xmlns="http://www.w3.org/2000/svg"'
+      + ' height="400" width="800"'
+      + ' viewBox="'+bbox+'">' +svg+'</svg>'; 
+    updateSvg(svgResult, svg);
+    return svg;
   }
 }
 
@@ -1781,6 +1918,14 @@ ClearCheckList();
 updateListByIndex(1)
 //===============================================================================
 
+function showOverlap(phrase, lineNo, event) {
+  vectorDisplay.style.display = 'block';
+  hbf1.genSVGcombined(phrase, hbf2, event.ctrlKey);
+}
+
+function hideOverlap(event) {
+  vectorDisplay.style.display = 'none';
+}
 
 function UpdateWordCount() {
   var wlc = document.getElementById('wordcount');
@@ -1905,6 +2050,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-06-07j</p>
+</br>Tool Version: 2025-07-01</p>
 </body>
 </html>
