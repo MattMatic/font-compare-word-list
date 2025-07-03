@@ -591,22 +591,28 @@ function updateAlign() {
   <div class='dropdown'>
     <button class='dropbtn'>🔤Word List</button>
     <div class='dropdown-content' id='ddWordList'>
-    <a href='#' onclick='DownloadCheckList();' title='Save checkmarked words to file'>⏬Download</a></br>
-    <a href='#' onclick='SortWordList(false);' title='Sort the word list'>📊Sort by Word</a></br>
-    <a href='#' onclick='SortWordList(true);'  title='Sort the word list by note'>🗒Sort by Note</a></br>
+    <a href='#' onclick='DownloadCheckList();' title='Save check list to file'>⏬Download</a></br>
     <a href='#' onclick='pasteUniqueWords();' title='Paste Unique words - new words are checked'>⭐Paste Unique</a></br>
     </div>
   </div>
   <div class='dropdown'>
-    <button class='dropbtn'>✅Checkmark</button>
+    <button class='dropbtn'>📊Sort</button>
+    <div class='dropdown-content' id='ddWordList'>
+    <a href='#' onclick='SortWordList(false);' title='Sort by Word'>🔤Word</a></br>
+    <a href='#' onclick='SortWordList(false, true);'  title='Sort by Check then Word'>✅Check + Word</a></br>
+    <a href='#' onclick='SortWordList(true);'  title='Sort by Note then Word'>📓Note + Word</a></br>
+    </div>
+  </div>
+  <div class='dropdown'>
+    <button class='dropbtn'>✅Check List</button>
     <div class='dropdown-content'>
     <a href='#' onclick='ClearCheckListUser();' title='Remove check from all words'>⬜Clear All</a></br>
     <a href='#' onclick='CheckAllList();' title='Check all words'>✅Set All</a></br>
     <a href='#' onclick='InvertCheckList();' title='Toggle check for all words'>🔵Invert</a></br>
-    <a href='#' onclick='CheckNotes();' title='Check all words that have some text in the note field'>🔤Check Notes</a></br>
+    <a href='#' onclick='CheckNotes();' title='Check all words that have some text in the note field'>📓Check Notes</a></br>
 
-    <a href='#' onclick='openFontCompareTool();' title='Send check mark words to HarfBuzz Font Compare Tool'>📤> Font Compare</a></br>
-    <a href='#' onclick='openFontForceFieldTool();' title='Send check mark words to Font Force Field Tool'>📤> Force Field</a></br>
+    <a href='#' onclick='openFontCompareTool();' title='Send checked words to HarfBuzz Font Compare Tool'>➜ Font Compare</a></br>
+    <a href='#' onclick='openFontForceFieldTool();' title='Send checked words to Font Force Field Tool'>➜ Force Field</a></br>
     </div>
   </div>
 
@@ -621,13 +627,13 @@ function updateAlign() {
         <tr><th>Regular Expression:</th><td><input type='text' name='regExpression' id='regExpression'/>
           ^=start, $=end, \=escape
         </td></tr>
-        <tr><th>Checkmark:</th><td>
+        <tr><th>Check:</th><td>
           <input type='radio' name='regExpOp' value='check' checked><label for='check'>Check</label></br>
           <input type='radio' name='regExpOp' value='uncheck'><label for='uncheck'>Uncheck</label></br>
           <input type='radio' name='regExpOp' value='invert'><label for='invert'>Invert</label>          
         </td></tr>
         <tr><th></th><td>
-          <button onclick='CheckmarkRegExp();' title='Run regular expression and adjust checkmark'>Search</button>
+          <button onclick='CheckmarkRegExp();' title='Run regular expression and adjust check'>Search</button>
         </td></tr>
       </table>
     </div>
@@ -675,11 +681,11 @@ function updateAlign() {
           </td>
         </tr>
         <tr>
-          <th><button onclick='UpdateDifferences();' title='Regression test:&#13;&#10;For each word where HarfBuzz differs between Font#1 and Font#2 -> toggle the check mark.&#13;&#10;&#13;&#10;Words left checkmarked will be:&#13;&#10;• requested changes that did not occur&#13;&#10;• unexpected changes'>Update Differences</button></th>
+          <th><button onclick='UpdateDifferences();' title='Regression test:&#13;&#10;For each word where HarfBuzz differs between Font#1 and Font#2 -> toggle the check.&#13;&#10;&#13;&#10;Words left checked will be:&#13;&#10;• requested changes that did not occur&#13;&#10;• unexpected changes'>Update Differences</button></th>
           <td><input type='checkbox' id='HBGIDs' oninput='updateLanguage();' title='Unchecked = ignore glyph ID when comparing; Checked = compare glyph ID in HarfBuzz output'>Compare GIDs</input></td>
         </tr>
         <tr>
-          <th><button onclick='CheckDifferentGlyphs();' title='Render the outlines and check any that have difference:area ratio too high'>Compare Outlines</button></th>
+          <th><button onclick='CheckDifferentGlyphs();' title='Render the outlines and check any that have large difference area'>Compare Outlines</button></th>
           <td>
             <font color='red'>EXPERIMENTAL</font></br>
             <input type='text' id='HBCGtolerance' title='1000s designUnits^2 area tolerance' value='20'></input></br>
@@ -1593,7 +1599,7 @@ function DeleteDuplicates() {
   window.alert('Duplicates '+count);
 }
 
-function SortWordList(sortByNote) {
+function SortWordList(sortByNote, byChecked) {
   if (!window.confirm('Sort word list?\r\nCannot be undone!!!')) return;
   var compareWord = function(a,b) {
     const aw = a.getWord();
@@ -1615,6 +1621,20 @@ function SortWordList(sortByNote) {
     }
     return compareWord(a, b);
   }
+  var compareCheck = function(a,b) {
+    if (a.getChecked()) {
+      if (b.getChecked())
+        return compareWord(a,b);
+      return -1;
+    }
+    if (b.getChecked()) {
+      return 1;
+    }
+    return compareWord(a,b);
+  }
+  if (byChecked)
+    wordList.sort(compareCheck);
+  else
   if (sortByNote)
     wordList.sort(compareNote);
   else
@@ -1853,7 +1873,7 @@ function saveToLocalStorage() {
 }
 
 function clearLocalStorage() {
-  if (!window.confirm('Clear all words, checkmarks, notes, and localStorage?\r\nCANNOT be undone!!!')) return;
+  if (!window.confirm('Clear all words, check lists, notes, and localStorage?\r\nCANNOT be undone!!!')) return;
   window.localStorage.clear();
   loadFromLocalStorage();
   resetCheckListChanged(); // Because we've save it
@@ -2050,6 +2070,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-07-01</p>
+</br>Tool Version: 2025-07-03</p>
 </body>
 </html>
