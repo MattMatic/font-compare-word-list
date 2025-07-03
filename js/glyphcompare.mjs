@@ -38,19 +38,24 @@ function isAssigned(obj) {
 // Class to wrap up a Clipper2 Paths64 and Bounding Box
 // and provide some basic optimisation calculations
 export class CPaths64 {
-  constructor() {
-    this.paths64 = new Clipper2Z.Paths64();
+  constructor(paths64, dontFindBoundingBox) {
     this.bbox = {x:{min:NaN, max:NaN},y:{min:NaN, max:NaN},width:0,height:0};
+    if (paths64) {
+      this.paths64 = paths64;
+      if (!dontFindBoundingBox) this.findBoundingBox();
+    }
+    else {
+      this.paths64 = new Clipper2Z.Paths64();
+    }
   }
   destroy() {
     this.freePath();
   }
   freePath() {
-    if (isAssigned(this.paths64)) {
-      this.paths64.clear();
-      this.paths64.delete();
-      delete this.paths64;      
-    }
+    if (!this.paths64) return;
+    this.paths64.clear();
+    this.paths64.delete();
+    delete this.paths64;
   }
   // Iterate through the paths and each path to find bounding box
   findBoundingBox() {
@@ -67,16 +72,16 @@ export class CPaths64 {
         if (!isAssigned(this.bbox.x.max) || (x > this.bbox.x.max)) this.bbox.x.max = x;
         if (!isAssigned(this.bbox.y.min) || (y < this.bbox.y.min)) this.bbox.y.min = y;
         if (!isAssigned(this.bbox.y.max) || (y > this.bbox.y.max)) this.bbox.y.max = y;
-        point.delete(); //????
+        point.delete();
       }
       path.delete();
     }
     this.updateWidthHeight();
   }
   // Update just the bounding box width and height
-  updateWidthHeight() {    
+  updateWidthHeight() {
     this.bbox.width  = (this.bbox.x.max - this.bbox.x.min);
-    this.bbox.height = (this.bbox.y.max - this.bbox.y.min);    
+    this.bbox.height = (this.bbox.y.max - this.bbox.y.min);
   }
   // Return the bound box
   getBoundingBox() {
@@ -120,7 +125,7 @@ export class CPaths64 {
   }
   // Set this CPaths64 to a Clipper2Z Paths64 value, updating the bounding box
   setPaths64(ps64, dontFindBoundingBox) {
-    if (isAssigned(this.paths64) && (ps64 != this.paths64)) {
+    if (ps64 !== this.paths64) {
       this.freePath();
     }
     this.paths64 = ps64;
@@ -131,9 +136,7 @@ export class CPaths64 {
     oxi = Number(oxi);
     oyi = Number(oyi);
     const { TranslatePaths64 } = Clipper2Z;
-    var result = new CPaths64();
-    result.freePath();
-    result.setPaths64(TranslatePaths64(this.paths64, oxi, oyi), true);
+    var result = new CPaths64(TranslatePaths64(this.paths64, oxi, oyi), true);
     result.bbox.x.min = this.bbox.x.min + oxi;
     result.bbox.x.max = this.bbox.x.max + oxi;
     result.bbox.y.min = this.bbox.y.min + oyi;
@@ -177,7 +180,7 @@ export class CPaths64 {
   // Returns null if no collision.
   // Otherwise returns a new CPaths64 with the intersection
   collisionCPath(cp) {
-    const { Intersect64, Union64FillRule, FillRule } = Clipper2Z;
+    const { Intersect64, FillRule } = Clipper2Z;
     if (this.isFarAway(cp)) {
       return null;
     }
@@ -187,15 +190,13 @@ export class CPaths64 {
       intersect.delete();
       return null;
     }
-    var result = new CPaths64();
-    result.setPaths64(intersect);
+    var result = new CPaths64(intersect);
     return result;
   }
   // Meld `cp` into this CPaths64
   unionWith(cp) {
-    const { Union64, FillRule, Union64FillRule } = Clipper2Z;
-    var res = Union64(this.paths64, cp.paths64, FillRule.NonZero);
-    this.freePath();
+    const { Union64, FillRule } = Clipper2Z;
+    let res = Union64(this.paths64, cp.paths64, FillRule.NonZero);
     this.setPaths64(res, true);
     if (cp.bbox.x.min < this.bbox.x.min) this.bbox.x.min = cp.bbox.x.min;
     if (cp.bbox.x.max > this.bbox.x.max) this.bbox.x.max = cp.bbox.x.max;
@@ -204,24 +205,18 @@ export class CPaths64 {
     this.updateWidthHeight();
   }
   xorWith(cp) {
-    const { Intersect64, Xor64, FillRule, Union64FillRule } = Clipper2Z;
+    const { Xor64, FillRule } = Clipper2Z;
     var res = Xor64(this.paths64, cp.paths64, FillRule.NonZero);
     this.freePath();
     this.setPaths64(res);
   }
   differenceToNewCPaths64(cp) {
-    const { Difference64, Xor64, FillRule, Union64FillRule } = Clipper2Z;
-    var res = Difference64(this.paths64, cp.paths64, FillRule.NonZero);
-    var obj = new CPaths64();
-    obj.setPaths64(res);
-    return obj;
+    const { Difference64, FillRule } = Clipper2Z;
+    return new CPaths64(Difference64(this.paths64, cp.paths64, FillRule.NonZero));
   }
   xorToNewCPaths64(cp) {
-    const { Difference64, Xor64, FillRule, Union64FillRule } = Clipper2Z;
-    var res = Xor64(this.paths64, cp.paths64, FillRule.NonZero);
-    var obj = new CPaths64();
-    obj.setPaths64(res);
-    return obj;
+    const { Xor64, FillRule } = Clipper2Z;
+    return new CPaths64(Xor64(this.paths64, cp.paths64, FillRule.NonZero));
   }
   // Count the positive paths in the set
   // (Used for finding 'far' glyphs)
@@ -253,7 +248,7 @@ export class CPaths64 {
   closePath() {
     const { MakePath64, Paths64 } = Clipper2Z;
     if (this.points.length > 0) {
-      if (!isAssigned(this.paths64)) {
+      if (!this.paths64) {
         this.paths64 = new Paths64();
       }
       this.points.push(this.points[0], this.points[1]); // Close the path back to the beginning
@@ -271,25 +266,21 @@ export class GlyphCompareClass {
   }
   destroy() {
     this.freeFont();
-    if (this.buffer) {
-      this.buffer.destroy();
-      delete this.buffer;
-    }
     if (this.paths64) {
       this.paths64.destroy();
       delete this.paths64;
     }
   }
   freeFont() {
-    if (isAssigned(this.font)) { this.font.destroy(); delete(this.font); }
-    if (isAssigned(this.face)) { this.face.destroy(); delete(this.face); }
-    if (isAssigned(this.blob)) { this.blob.destroy(); delete(this.blob); }
+    if (this.font) { this.font.destroy(); delete(this.font); }
+    if (this.face) { this.face.destroy(); delete(this.face); }
+    if (this.blob) { this.blob.destroy(); delete(this.blob); }
     //this.glyphs = {};
     this.freeGlyphCache();
   }
   freeGlyphCache() {
-    if (!isAssigned(this.glyphs)) return;
-    if (isAssigned(this.glyphs) && (this.glyphs.length>0)) {
+    if (!this.glyphs) return;
+    if (this.glyphs && (this.glyphs.length>0)) {
       Object.keys(this.glyphs).forEach(function(k) {
         const e = this.glyphs[k];
         e.cpaths.freePath();
@@ -317,7 +308,7 @@ export class GlyphCompareClass {
   setFontBlob(fb) {
     this.freeFont();
     this.fontBlob = fb;
-    if (!isAssigned(fb)) return;
+    if (!fb) return;
 
     this.blob = hb.createBlob(this.fontBlob);
     this.face = hb.createFace(this.blob, 0);
@@ -329,7 +320,7 @@ export class GlyphCompareClass {
   // Also calculates the bound box in `bbox` with width and height
   // NOTE: Cubic Bezier curve flattening not tested yet!!
   glyphToPolyline(glyphId) {
-    if (!isAssigned(this.glyphs[glyphId])) {
+    if (!this.glyphs[glyphId]) {
       var ptr = this.font.ptr;
       var exports = harfBuzzModule.wasmExports;
       var addFunction = harfBuzzModule.addFunction;
@@ -422,41 +413,42 @@ export class GlyphCompareClass {
     return this.glyphs[glyphId];
   }
   shape(txt, features) {
-    if (this.buffer) this.buffer.destroy();
-    this.buffer = hb.createBuffer();
-    this.buffer.addText(txt);
-    this.buffer.guessSegmentProperties();
+    let buffer = hb.createBuffer();
+    buffer.addText(txt);
+    buffer.guessSegmentProperties();
     if ((typeof this.script === 'string') && (this.script.length > 0))
-      this.buffer.setScript(this.script);
+      buffer.setScript(this.script);
     if ((typeof this.language === 'string') && (this.script.language > 0))
-      this.buffer.setLanguage(this.language);
-    hb.shape(this.font, this.buffer, features, 0);
-    this.result = this.buffer.json(this.font);    
+      buffer.setLanguage(this.language);
+    hb.shape(this.font, buffer, features, 0);
+    this.result = buffer.json(this.font);
+    buffer.destroy();
     return this.result;
   }
   toPath(json) {
-    if (this.paths64) this.paths64.destroy();
-    this.cpaths64 = new CPaths64();
+    let cpaths64 = new CPaths64();
     if (!json) json = this.result;
-    const obj = this;
     let pos = {x:0, y:0};
-    json.forEach(function(r) {
-      const paths = obj.glyphToPolyline(r.g);
+    for (let r of json) {
+      const paths = this.glyphToPolyline(r.g);
       const px = pos.x + r.dx;
       const py = pos.y + r.dy;
       let glyph = paths.cpaths.translateToNewCPaths64(px, py);
-      obj.cpaths64.unionWith(glyph);
+      cpaths64.unionWith(glyph);
       glyph.destroy();
       pos.x += r.ax;
       pos.y += r.ay;
-    });
+    }
+    if (this.cpaths64) {
+      this.cpaths64.freePath();
+    }
+    this.cpaths64 = cpaths64;
     return this.cpaths64;
   }
   getArea() {
     return this.cpaths64.getArea().fill;
   }
   overlapToCPaths64(glyphCompareClassOther) {
-    //let diff = this.cpaths64.differenceToNewCPaths64(glyphCompareClassOther.cpaths64);
     let diff = this.cpaths64.xorToNewCPaths64(glyphCompareClassOther.cpaths64);
     return diff;
   }
@@ -467,7 +459,7 @@ export class GlyphCompareClass {
     let area = this.cpaths64.getArea();
     res.fillRatio = res.fill / area.fill;
     res.orig = area;
-    diff.destroy();
+    diff.freePath();
     return res;
   }
 };

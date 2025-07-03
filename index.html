@@ -798,14 +798,14 @@ class hbFont {
     this.freeFont();
     this.fileDescription = null;
     delete(this.fontBlob);
-    if (this.gc) this.gc.destroy();
-    delete(this.gc);
   }
   freeFont() {
     this.results = {};
     if (this.font) { this.font.destroy(); delete(this.font); }
     if (this.face) { this.face.destroy(); delete(this.face); }
     if (this.blob) { this.blob.destroy(); delete(this.blob); }
+    if (this.gc) this.gc.destroy();
+    delete this.gc;
   }
   setFontBlob(fb) {
     this.freeFont();
@@ -1032,7 +1032,6 @@ class wordEntryClass {
   calcDifferenceArea(hbf1, hbf2) {
     hbf1.shapeGlyphCompare(this.word);
     hbf2.shapeGlyphCompare(this.word);
-    //??var diff = hbf1.compare(hbf2, tolCompare);
     let da = 0;
     let diffs = hbf1.compareOverlap(hbf2);
     if (diffs) da = Math.round(diffs.fill) / 1000.0;
@@ -1349,8 +1348,13 @@ function doUntil(loop, stopCondition, yieldCondition) {
 function updateStatusMessage(i, foundCount, total) {
   if (i <= 0)
     statusUpdate.innerHTML = '-';
-  else
-    statusUpdate.innerHTML = '<div><font color="red">'+i + '/'+ total+'</font></div></br>'+(foundCount ?? '')+' found';
+  else {
+    let html = '<span><font color="red">'+i + '/'+ total+'</font></span>'
+    if (foundCount > 0) {
+      html += '</br>'+foundCount + ' found';
+    }
+    statusUpdate.innerHTML = html;
+  }
 }
 
 function updateBitCountsOne(t, bits, v) {
@@ -2117,6 +2121,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-07-03 k</p>
+</br>Tool Version: 2025-07-03 q</p>
 </body>
 </html>
