@@ -267,14 +267,10 @@ function BuildNoteHtml(n) {
 
 function BuildDifference(n, phrase) {
   if (!HBCGlive.checked) return '';
-  hbf1.shapeGlyphCompare(phrase);
-  hbf2.shapeGlyphCompare(phrase);
-  //??var diff = hbf1.compare(hbf2, tolCompare);
-  let diffs = hbf1.compareOverlap(hbf2);
-  if (!diffs) return '';
-  let duDiff = Math.round(diffs.fill) / 1000.0;
-  if (duDiff === 0) return '';
-  return duDiff;
+  let da = wordList[n].getDifferenceArea();
+  if (typeof da === 'undefined') da = wordList[n].calcDifferenceArea(hbf1, hbf2);
+  if (da === 0) return '';
+  return da;
 }
 
 const hb_icons = {
@@ -601,6 +597,7 @@ function updateAlign() {
     <a href='#' onclick='SortWordList(false);' title='Sort by Word'>🔤Word</a></br>
     <a href='#' onclick='SortWordList(false, true);'  title='Sort by Check then Word'>✅Check + Word</a></br>
     <a href='#' onclick='SortWordList(true);'  title='Sort by Note then Word'>📓Note + Word</a></br>
+    <a href='#' onclick='SortWordListArea();'  title='Sort by Difference Area'>📐Area + Word</a></br>
     </div>
   </div>
   <div class='dropdown'>
@@ -1029,9 +1026,34 @@ class wordEntryClass {
     // and append
     this.note = diffValueToNote(this.note, diffs);
   }
+  removeDifferenceArea() {
+    delete this.diffArea;
+  }
+  calcDifferenceArea(hbf1, hbf2) {
+    hbf1.shapeGlyphCompare(this.word);
+    hbf2.shapeGlyphCompare(this.word);
+    //??var diff = hbf1.compare(hbf2, tolCompare);
+    let da = 0;
+    let diffs = hbf1.compareOverlap(hbf2);
+    if (diffs) da = Math.round(diffs.fill) / 1000.0;
+    this.diffArea = da;
+    return da;
+  }
+  getDifferenceArea() { return this.diffArea; }
+  getDifferenceAreaCalc(hbf1, hbf2) {
+    if (typeof this.diffArea !== 'undefined') return this.diffArea;
+    return this.calcDifferenceArea(hbf1, hbf2);
+  }
 }
 
 var wordList = []; // An array of wordEntry objects
+
+function fontsHaveChanged() {
+  const size = wordList.length;
+  for (let i=0; i<size; i++) {
+    wordList[i].removeDifferenceArea();
+  }
+}
 
 function buildListFromFileContents(txt)
 {
@@ -1416,7 +1438,7 @@ function updateHBCGlive() {
   updateListByIndex(start_index);
 }
 
-function CheckDifferentGlyphs() {
+function CheckDifferentGlyphs(onCompletion) {
   let i = 0;
   const total = wordList.length;
 
@@ -1431,20 +1453,14 @@ function CheckDifferentGlyphs() {
   hbf1.setScriptLang(HBScript.value, HBLang.value);
   hbf2.setScriptLang(HBScript.value, HBLang.value);
 
-  const tolerance = parseFloat(HBCGtolerance.value) * 1000.0;
+  const tolerance = parseFloat(HBCGtolerance.value);
 
   let checkCount = 0;
   updateStatusMessage(i, checkCount, total);
   const loop = () => {
-    var phrase = wordList[i].getWord();
-    hbf1.shapeGlyphCompare(phrase);
-    hbf2.shapeGlyphCompare(phrase);
-    //??var diff = hbf1.compare(hbf2, tolCompare);
-    let diffs = hbf1.compareOverlap(hbf2);
-    console.log('diffs', phrase, diffs);
-
-    if (diffs) {
-      if (diffs.fill >= tolerance) {
+    let diffs = wordList[i].getDifferenceAreaCalc(hbf1, hbf2);
+    if (diffs && !onCompletion) {
+      if (diffs >= tolerance) {
         wordList[i].setChecked(true);
         checkCount++;
       }      
@@ -1461,6 +1477,9 @@ function CheckDifferentGlyphs() {
       updateListByIndex(1);
       window.scroll(0,0);
       updateStatusMessage(-1);
+      if (onCompletion) {
+        onCompletion();
+      }
     }
   }
   doUntil(loop, stopCondition, yieldCondition);
@@ -1599,6 +1618,14 @@ function DeleteDuplicates() {
   window.alert('Duplicates '+count);
 }
 
+
+function _updateAfterSort() {
+  UpdateWordCount();
+  updateCheckListCount();
+  updateListByIndex(1);
+  updateStatusMessage(-1);
+}
+
 function SortWordList(sortByNote, byChecked) {
   if (!window.confirm('Sort word list?\r\nCannot be undone!!!')) return;
   var compareWord = function(a,b) {
@@ -1639,10 +1666,29 @@ function SortWordList(sortByNote, byChecked) {
     wordList.sort(compareNote);
   else
     wordList.sort(compareWord);
-  UpdateWordCount();
-  updateCheckListCount();
-  updateListByIndex(1);
-  updateStatusMessage(-1);
+  _updateAfterSort();
+}
+
+function SortWordListArea() {
+  if (!window.confirm('Sort word list?\r\nCannot be undone!!!')) return;
+  HBCGlive.checked = true;
+  CheckDifferentGlyphs( () => {
+    var compare = function(a,b) {
+      let da = a.getDifferenceArea();
+      let db = b.getDifferenceArea();
+      if (da > db)
+        return -1;
+      if (da < db)
+        return 1;
+      const aw = a.getWord();
+      const bw = b.getWord();
+      if (aw < bw) return -1;
+      if (aw > bw) return 1;
+      return 0;
+    }
+    wordList.sort(compare);
+    _updateAfterSort();    
+  });
 }
 
 function DeleteAll() {
@@ -2031,6 +2077,7 @@ function applyFontX(file, fontname, id, hbo, data) {
       document.fonts.add(fontFace);
       if (file) console.log('loaded '+file.name);
       changeFontAscentDescent(fontname, '200%', '200%');
+      fontsHaveChanged();
       updateListByField();
     },
     (err) => {
@@ -2070,6 +2117,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-07-03</p>
+</br>Tool Version: 2025-07-03 k</p>
 </body>
 </html>
