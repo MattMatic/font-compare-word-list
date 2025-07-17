@@ -1615,6 +1615,7 @@ function DeleteDuplicates() {
     }
   }
   wordList = res;
+  if (count > 0) checkListHasChanged();
   UpdateWordCount();
   updateCheckListCount();
   updateListByIndex(1);
@@ -1624,6 +1625,7 @@ function DeleteDuplicates() {
 
 
 function _updateAfterSort() {
+  checkListHasChanged();
   UpdateWordCount();
   updateCheckListCount();
   updateListByIndex(1);
@@ -1896,7 +1898,41 @@ function DownloadCheckList() {
   //document.body.removeChild(a);
 }
 
-function saveToLocalStorage() {
+
+// Ref: https://gist.github.com/Explosion-Scratch/357c2eebd8254f8ea5548b0e6ac7a61b
+function compressStringToArrayBuffer(txt, encoding = 'gzip') {
+  const byteArray = new TextEncoder().encode(txt);
+  const cs = new CompressionStream(encoding);
+  const writer = cs.writable.getWriter();
+  writer.write(byteArray);
+  writer.close();
+  const buff = new Response(cs.readable).arrayBuffer();
+  return buff;
+}
+
+function decompressArrayBufferToString(byteArray, encoding='gzip') {
+  const cs = new DecompressionStream(encoding);
+  const writer = cs.writable.getWriter();
+  writer.write(byteArray);
+  writer.close();
+  return new Response(cs.readable).arrayBuffer().then(function (arrayBuffer) {
+    return new TextDecoder().decode(arrayBuffer);
+  });
+}
+
+function encodeArrayBufferToBase64(arrayBuffer) {
+  const base64String = btoa(
+    new Uint8Array(arrayBuffer)
+      .reduce((data, byte) => data + String.fromCharCode(byte), '')
+  );
+  return base64String;
+}
+
+function decodeBase64ToArrayBuffer(base64String) {
+  return Uint8Array.from(atob(base64String), c=>c.charCodeAt(0));
+}
+
+async function saveToLocalStorage() {
   const ls = window.localStorage;
   try {
     ls.setItem('wordListFilename', wordlist_filename || '');
@@ -1912,7 +1948,10 @@ function saveToLocalStorage() {
       ls.setItem('font2.name',    hbf2.fontNames.fullName);
       ls.setItem('font2.version', hbf2.fontNames.version);
     }
-    ls.setItem('wordList', JSON.stringify(wordList));
+    const json = JSON.stringify(wordList);
+    const buff = await compressStringToArrayBuffer(json);
+    const b64 = encodeArrayBufferToBase64(buff);
+    ls.setItem('wordList', b64);
     //---- localStorage is VERY limited. Cannot save the font :-(
     //ls.setItem('fontBlob1', JSON.stringify(hbf1.fontBlob));
     //ls.setItem('fontBlob2', JSON.stringify(hbf2.fontBlob));
@@ -1948,10 +1987,20 @@ function setLastFontDetails(root, id) {
       + '<font size="-1">'+version+'</font></font>';
 }
 
-function loadFromLocalStorage() {
+async function loadFromLocalStorage() {
   //console.log('loadFromLocalStorage');//!!
   const ls = window.localStorage;
   var _wl = ls.getItem('wordList');
+  var buff;
+  try {
+    buff = decodeBase64ToArrayBuffer(_wl);
+    if (buff) {
+      // Wordlist is compressed...
+      _wl = await decompressArrayBufferToString(buff);
+    }
+  } catch(e) {
+    buff = null;
+  }
   wordlist_filename = ls.getItem('wordListFilename');
   if (_wl) {
     ls_wordlist = JSON.parse(_wl);
@@ -2121,6 +2170,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-07-03 q</p>
+</br>Tool Version: 2025-07-17 i</p>
 </body>
 </html>
