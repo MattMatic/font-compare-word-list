@@ -547,7 +547,7 @@ function updateAlign() {
       <div class='dropdown'>
         <!--<button class='dropbtn'></button>-->
         <div class='dropdown-content' id='ddProgress'>
-          <table border=0 width='100%'><tr><th>Progress:</th><td><div id='statusUpdate'>-</div> <button onclick='AbortProgress();' id='AbortButton' hidden>Abort!</button></td></tr></table>
+          <table border=0 width='100%'><tr><th>Progress:</th><td><div id='statusUpdate'>-</div> <button onclick='doAbortLongRunning();' id='AbortButton' hidden>Abort!</button></td></tr></table>
         </div>
       </div>
     </td>
@@ -1295,54 +1295,44 @@ function CheckmarkRegExp() {
   window.alert('Found '+count+' matches');
 }
 
-var AbortTheLoop = false;
+var AbortLongRunning = false;
 
-function AbortReset() {
-  AbortTheLoop = false;
+function startLongRunning() {
+  AbortLongRunning = false;
   AbortButton.hidden = false;
   ddProgress.style.display = 'block';
 }
 
-function AbortProgress() {
-  AbortTheLoop = true;
+function doAbortLongRunning() {
+  AbortLongRunning = true;
 }
 
-// See: https://elplatt.com/javascript-updating-dom-during-long-running-computation
-function doUntil(loop, stopCondition, yieldCondition) {
-    AbortReset();
-    // Wrap function in promise so it can run asynchronously
-    return new Promise((resolve, reject) => {
+function doneLongRunning() {
+  AbortButton.hidden = true;
+  ddProgress.style.display = '';
+}
 
-    // Build outerLoop function to pass to setTimeout
-    let outerLoop = function () {
-      while (true) {
-        // Execute a single inner loop iteration
-        loop();
+function isLongRunning() {
+  return !AbortButton.hidden;
+}
 
-        if (stopCondition() /*|| AbortTheLoop*/) {
-            // Resolve promise, exit outer loop,
-                        // and do not re-enter
-            AbortButton.hidden = true;
-            ddProgress.style.display = '';
-            resolve();
-            break;
-        } else if (yieldCondition()) {
-            // Exit outer loop and queue up next
-                        // outer loop iteration for next event loop cycle
-            setTimeout(outerLoop, 0);
-            break;
-        }
-        // Continue to next inner loop iteration
-        // without yielding
-      }
-    };
+// polyfill for scheduler.yield
+globalThis.scheduler = globalThis.scheduler || {};
+globalThis.scheduler.yield = 
+  globalThis.scheduler.yield || 
+  (() => new Promise((r) => setTimeout(r, 0)));
 
-    // Start the first iteration of outer loop,
-    // unless the stop condition is met
-    if (!stopCondition()) {
-        setTimeout(outerLoop, 0);
-    }
-  });
+class ElapsedTimer {
+  constructor(t=32) {
+    this.max = t;
+    this.next = performance.now() + t;
+  }
+  elapsed() {
+    const now = performance.now();
+    if (now < this.next) return false;
+    while (now > this.next) this.next += this.max;
+    return true;
+  }
 }
 
 function updateStatusMessage(i, foundCount, total) {
@@ -1381,10 +1371,12 @@ function mapCountsToDisplay(t) {
   HBCC_identical_no.innerHTML = t[hb_icons.identical[2]] || '';
 }
 
-function CheckSimilar() {
+async function CheckSimilar() {
+  const total = wordList.length;
   let i = 0;
   var bits = 0;
   var bit_counts = [];
+
   if (HBCC_count.checked)     bits |= hb_icons.count[2];
   if (HBCC_clusters.checked)  bits |= hb_icons.cluster[2];
   if (HBCC_advance.checked)   bits |= hb_icons.advance[2];
@@ -1392,15 +1384,15 @@ function CheckSimilar() {
   if (HBCC_gid.checked)       bits |= hb_icons.gid[2];
   if (HBCC_identical.checked) bits |= hb_icons.identical[2];
 
-  const total = wordList.length;
+
+  if (isLongRunning()) return; // Something in progress already
 
   if (!checkBothFontsLoaded()) return;
   if (total > 5000) {
     if (!window.confirm('This will take a LONG time. Continue?')) return;
   }
 
-  const stopCondition = () => (i >= total) || AbortTheLoop;
-  const yieldCondition = () => i % update_interval == 0;
+  startLongRunning();
   const checkGIDs    = HBGIDs.checked;
 
   hbf1.setScriptLang(HBScript.value, HBLang.value);
@@ -1408,8 +1400,11 @@ function CheckSimilar() {
 
   var checkCount = 0;
   updateStatusMessage(i, checkCount, total);
-  const loop = () => {
-    var phrase = wordList[i].getWord();
+
+  let et = new ElapsedTimer();
+
+  for (let i=0; i<total; i++) {
+    const phrase = wordList[i].getWord();
     hbf1.shape(phrase);
     hbf2.shape(phrase);
     var diff = hbf1.compare(hbf2, tolCompare);
@@ -1419,40 +1414,41 @@ function CheckSimilar() {
       checkCount++;
     }
     wordList[i].setDiff(diff);  // Update the difference field
-    i++;
-    if (yieldCondition()) {
+
+    if (et.elapsed()) {
       updateStatusMessage(i, checkCount, total);
       mapCountsToDisplay(bit_counts);
+      await scheduler.yield();      
     }
-    if (stopCondition()) {
-      checkListHasChanged();
-      updateCheckListCount();
-      UpdateWordCount();
-      updateListByIndex(1);
-      window.scroll(0,0);
-      updateStatusMessage(-1);
-      mapCountsToDisplay(bit_counts);
+    if (AbortLongRunning) {
+      break;
     }
   }
-
-  doUntil(loop, stopCondition, yieldCondition);
+  checkListHasChanged();
+  updateCheckListCount();
+  UpdateWordCount();
+  updateListByIndex(1);
+  window.scroll(0,0);
+  updateStatusMessage(-1);
+  mapCountsToDisplay(bit_counts);
+  doneLongRunning();
 }
 
 function updateHBCGlive() {
   updateListByIndex(start_index);
 }
 
-function CheckDifferentGlyphs(onCompletion) {
+async function CheckDifferentGlyphs(onCompletion) {
   let i = 0;
   const total = wordList.length;
+  if (isLongRunning()) return;
 
   if (!checkBothFontsLoaded()) return;
   if (total > 5000) {
     if (!window.confirm('This will take a long, LONG time. Continue?')) return;
   }
-
-  const stopCondition = () => (i >= total) || AbortTheLoop;
-  const yieldCondition = () => i % update_interval == 0;
+  startLongRunning();
+  let et = new ElapsedTimer();
 
   hbf1.setScriptLang(HBScript.value, HBLang.value);
   hbf2.setScriptLang(HBScript.value, HBLang.value);
@@ -1461,7 +1457,8 @@ function CheckDifferentGlyphs(onCompletion) {
 
   let checkCount = 0;
   updateStatusMessage(i, checkCount, total);
-  const loop = () => {
+
+  for (let i=0; i<total; i++) {
     let diffs = wordList[i].getDifferenceAreaCalc(hbf1, hbf2);
     if (diffs && !onCompletion) {
       if (diffs >= tolerance) {
@@ -1470,23 +1467,24 @@ function CheckDifferentGlyphs(onCompletion) {
       }      
     }
 
-    i++;
-    if (yieldCondition()) {
+    if (et.elapsed()) {
       updateStatusMessage(i, checkCount, total);
+      await scheduler.yield();
     }
-    if (stopCondition()) {
-      checkListHasChanged();
-      updateCheckListCount();
-      UpdateWordCount();
-      updateListByIndex(1);
-      window.scroll(0,0);
-      updateStatusMessage(-1);
-      if (onCompletion) {
-        onCompletion();
-      }
+    if (AbortLongRunning) {
+      break;
     }
   }
-  doUntil(loop, stopCondition, yieldCondition);
+  checkListHasChanged();
+  updateCheckListCount();
+  UpdateWordCount();
+  updateListByIndex(1);
+  window.scroll(0,0);
+  updateStatusMessage(-1);
+  if (onCompletion) {
+    onCompletion();
+  }
+  doneLongRunning();
 }
 
 function CheckNotes() {
@@ -1509,17 +1507,17 @@ function CheckNotes() {
   window.alert('Checked '+count+' words');
 }
 
-function UpdateDifferences() {
+async function UpdateDifferences() {
   let i = 0;
   const total = wordList.length;
 
+  if (isLongRunning()) return;
   if (!checkBothFontsLoaded()) return;
   if (total > 5000) {
     if (!window.confirm('This will take a LONG time. Continue?')) return;
   }
+  startLongRunning();
 
-  const stopCondition = () => (i >= total) || AbortTheLoop;
-  const yieldCondition = () => i % update_interval == 0;
   const checkGIDs = HBGIDs.checked;
 
   hbf1.setScriptLang(HBScript.value, HBLang.value);
@@ -1527,8 +1525,11 @@ function UpdateDifferences() {
 
   let checkCount = 0;
   updateStatusMessage(i, checkCount, total);
-  const loop = () => {
-    var phrase = wordList[i].getWord();
+
+  let et = new ElapsedTimer();
+
+  for (let i=0; i<total; i++) {
+    const phrase = wordList[i].getWord();
     hbf1.shape(phrase);
     hbf2.shape(phrase);
     var diff = hbf1.compare(hbf2, tolCompare);
@@ -1537,33 +1538,38 @@ function UpdateDifferences() {
       wordList[i].setChecked(!wordList[i].getChecked());
       checkCount++;
     }
-    i++;
-    if (yieldCondition()) {
+
+    if (et.elapsed()) {
       updateStatusMessage(i, checkCount, total);
+      await scheduler.yield();      
     }
-    if (stopCondition()) {
-      checkListHasChanged();
-      updateCheckListCount();
-      UpdateWordCount();
-      updateListByIndex(1);
-      window.scroll(0,0);
-      updateStatusMessage(-1);
+
+    if (AbortLongRunning) {
+      break;
     }
   }
-
-  doUntil(loop, stopCondition, yieldCondition);
+  checkListHasChanged();
+  updateCheckListCount();
+  UpdateWordCount();
+  updateListByIndex(1);
+  window.scroll(0,0);
+  updateStatusMessage(-1);
+  doneLongRunning();
 }
 
-function RemoveUnchecked() {
+async function RemoveUnchecked() {
+  if (isLongRunning()) return;
   if (!window.confirm('Delete all unchecked words?\r\nCannot be undone!!!')) return;
   var i = 0;
   var counter = 0;
   var deletedCount = 0;
   var newWordList = [];
   const size = wordList.length;
-  const stopCondition = () => i >= size;
-  const yieldCondition= () => (counter % 1234 /*update_interval*/) ==0;
-  const loop = () => {
+
+  startLongRunning();
+  let et = new ElapsedTimer();
+
+  for (let i=0; i<size; i++) {
     counter++;
     const wle = wordList[i];
     if (wle.getChecked()) {
@@ -1571,23 +1577,25 @@ function RemoveUnchecked() {
     } else {
       deletedCount++;      
     }
-    i++;
-    if (yieldCondition()) {
+    if (et.elapsed()) {
       updateStatusMessage(i, deletedCount, size);
+      await scheduler.yield();
     }
-    if (stopCondition()) {
-      wordList = newWordList; // Assign the new updated list
-      if (typeof wordlist_filename === 'string') {
-        if (!wordlist_filename.endsWith('(edited)')) wordlist_filename = wordlist_filename + ' (edited)';
-      }
-      UpdateWordCount();
-      updateCheckListCount();
-      updateListByIndex(1);
-      updateStatusMessage(-1);
-      window.alert('Deleted '+deletedCount);
+    if (AbortLongRunning) {
+      break;
     }
   }
-  doUntil(loop, stopCondition, yieldCondition);
+
+  wordList = newWordList; // Assign the new updated list
+  if (typeof wordlist_filename === 'string') {
+    if (!wordlist_filename.endsWith('(edited)')) wordlist_filename = wordlist_filename + ' (edited)';
+  }
+  UpdateWordCount();
+  updateCheckListCount();
+  updateListByIndex(1);
+  updateStatusMessage(-1);
+  window.alert('Deleted '+deletedCount);
+  doneLongRunning();
 }
 
 function DeleteDuplicates() {
@@ -2170,6 +2178,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-07-17 i</p>
+</br>Tool Version: 2025-07-17 p</p>
 </body>
 </html>
