@@ -107,12 +107,51 @@ th .dropdown-content{
   min-width: 600px;
   z-index: 0;
 }
+.tooltip {
+  position: relative;
+  display: inline-block;
+  border-bottom: 1px dotted #ccc;
+  color: #006080;
+}
+.tooltip .tooltiptext {
+  visibility: hidden;
+  position: absolute;
+  width: 340px;
+  background-color: #555;
+  color: #fff;
+  text-align: center;
+  padding: 5px 0;
+  border-radius: 6px;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+  opacity: 1;
+}
+.tooltip-bottom {
+  top: 135%;
+  left: 50%;
+  margin-left: -60px;
+}
+.tooltip-bottom::after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  margin-left: -5px;
+  margin-width: 5px;
+  border-style: solid;
+  border-color: transparent transparent #555 transparent;
+}
 </style>
 
 <script type="text/javascript" src="./js/hb.js"></script> <!-- Module - REQUIRED -->
 <script type="text/javascript" src="./js/hbjs.js"></script> <!-- Wrapper, can be used without -->
 <script type="text/javascript" src="./js/fontname.min.js"></script>
 <script type="text/javascript" src="./js/flatbezier.js"></script>
+<script type="text/javascript" src="./js/otinfo.min.js"></script>
 <script type='module' src="./js/glyphcompare.mjs" async></script>
 <script type='module' async>
 import {CPaths64, GlyphCompareClass} from './js/glyphcompare.mjs';
@@ -387,8 +426,8 @@ function addEntry(lineNo, theWordEntry, displayValue) {
 }
 
 function updateListByIndex(idx) {
-  hbf1.setScriptLang(HBScript.value, HBLang.value);
-  hbf2.setScriptLang(HBScript.value, HBLang.value);
+  hbf1.setScriptLang(inputScript.value, inputLanguage.value);
+  hbf2.setScriptLang(inputScript.value, inputLanguage.value);
 
   const displayValue = window.getComputedStyle(fontOverlap).display;
   var table = document.getElementById('word_list')
@@ -641,8 +680,18 @@ function updateAlign() {
     <div class='dropdown-content'>
       <table border=0 width='100%'>
         <tr><th>HTML Lang:</th><td><input type='text' id='HTMLLang' oninput='updateLanguage();' title='Web page language ID'/></td></tr>
-        <tr><th>Script:</th><td><input type='text' id='HBScript' oninput='updateLanguage();' title='HarfBuzz script tag (4 character). e.g. "arab"'/></td></tr>
-        <tr><th>Language:</th><td><input type='text' id='HBLang' oninput='updateLanguage();' title='HarfBuzz language tag (4 character)'/></td></tr>
+        <tr><th>Script:</th><td>
+          <span class='tooltip'>
+            <input type='text' id='inputScript' oninput='updateLanguage();'/>
+            <span class='tooltiptext tooltip-bottom' id='inputScriptList'>-</span>
+          </span>
+        </td></tr>
+        <tr><th>Language:</th><td>
+          <span class='tooltip'>
+            <input type='text' id='inputLanguage' oninput='updateLanguage();'/>
+            <span class='tooltiptext tooltip-bottom' id='inputLanguageList'>-</span>
+          </span>
+          </td></tr>
         <tr>
           <th><button onclick='CheckSimilar();' title='Check all words where HarfBuzz output is the same (Compare GIDs is considered)'>Compare and Check</button></th>
           <td>
@@ -783,6 +832,31 @@ function updateSvg(dive, html) {
   svge.currentTranslate.y = oldTranslate.y;
 }
 
+function fillOtInfoTables(fontInfo) {
+  fontInfo.scripts = new Set();
+  fontInfo.languages = new Set();
+  fontInfo.features = new Set();
+
+  let doGtable = function(t) {
+    if (!t) return;
+    if (t.scriptTable) {
+      for (const key in t.scriptTable) {
+        fontInfo.scripts.add(key);
+        for (const val of t.scriptTable[key]) {
+          fontInfo.languages.add(val);
+        }
+      }
+    }
+    if (t.featureListTable) {
+      for (const val of t.featureListTable) {
+        fontInfo.features.add(val);
+      }
+    }
+  }
+  doGtable(fontInfo.GSUB);
+  doGtable(fontInfo.GPOS);
+}
+
 class hbFont {
   constructor() {
     this.script = 'latn';
@@ -818,6 +892,9 @@ class hbFont {
       this.fileDescription = '';
     }
     if (!fb) return;
+    const otInfo = OTInfo.parse(fb);
+    this.fontInfo = otInfo[0];
+    fillOtInfoTables(this.fontInfo);
     this.blob = hb.createBlob(this.fontBlob);
     this.face = hb.createFace(this.blob, 0);
     this.font = hb.createFont(this.face);
@@ -1192,11 +1269,78 @@ function triCb(cb) {
   else if (!cb.checked) cb.readOnly=cb.indeterminate=true;
 }
 
+function iterateGtable(gtable, theKey, outputset) {
+  if (!gtable) return;
+  const scriptTable = gtable.scriptTable;
+  if (!scriptTable) return;
+  if (!scriptTable[theKey]) return;
+  for (const y of scriptTable[theKey]) {
+    outputset.add(y);
+  }
+}
+
+function mapToQuotes(list) {
+  return '"'+[...list].sort().join('","')+'"';
+}
+
+function getScriptLanguage(fontInfo, filterScript) {
+  let scripts = '';
+  let languages = '';
+  if (fontInfo) {
+    if (fontInfo.scripts.size > 0)
+      scripts = mapToQuotes(fontInfo.scripts);
+
+    let languageSet = fontInfo.languages;
+    if (filterScript !== '') {
+      filterScript = filterScript.toLowerCase();
+      languageSet = new Set();
+      iterateGtable(fontInfo.GSUB, filterScript, languageSet);
+      iterateGtable(fontInfo.GPOS, filterScript, languageSet);
+    }
+    if (languageSet.size > 0)
+      languages = mapToQuotes(languageSet);
+  }
+  return {
+    scripts: scripts,
+    languages: languages,
+  };
+}
+
 // Update the document language tag, and the HarfBuzz values
 function updateLanguage() {
+  const script = inputScript.value;
+  const language = inputLanguage.value;
+
+  inputScriptList.innerText = '(empty)';
+  inputLanguageList.innerText = '(empty)';
+
+  const details1 = getScriptLanguage(hbf1.fontInfo, script);
+  const details2 = getScriptLanguage(hbf2.fontInfo, script);
+  let scripts = details1.scripts;
+  if (scripts === '') {
+    scripts = details2.scripts;
+    if (scripts !== '') scripts = 'FONT2: '+scripts;
+  }
+  if ((details2.scripts !== '') && (details2.scripts !== details1.scripts)) {
+    scripts = 'FONT1: '+details1.scripts + '\r\n'+ 'FONT2: '+details2.scripts;
+  }
+  if (scripts !== '') inputScriptList.innerText = scripts;
+
+  let languages = details1.languages;
+  if (languages === '') {
+    languages = details2.languages;
+    if (languages !== '') languages = 'FONT2: '+languages;
+  }
+  if ((details2.languages !== '') && (details2.languages !== details1.languages)) {
+    languages = 'FONT1: '+details1.languages + '\r\n' + 'FONT2: '+details2.languages;
+  }
+  if (languages !== '') inputLanguageList.innerText = languages;
+
+  // TODO: FEATURES
+
   document.documentElement.setAttribute('lang', HTMLLang.value);
-  hbf1.setScriptLang(HBScript.value, HBLang.value);
-  hbf2.setScriptLang(HBScript.value, HBLang.value);
+  hbf1.setScriptLang(inputScript.value, inputLanguage.value);
+  hbf2.setScriptLang(inputScript.value, inputLanguage.value);
 }
 
 function ClearCheckList() {
@@ -1395,8 +1539,8 @@ async function CheckSimilar() {
   startLongRunning();
   const checkGIDs    = HBGIDs.checked;
 
-  hbf1.setScriptLang(HBScript.value, HBLang.value);
-  hbf2.setScriptLang(HBScript.value, HBLang.value);
+  hbf1.setScriptLang(inputScript.value, inputLanguage.value);
+  hbf2.setScriptLang(inputScript.value, inputLanguage.value);
 
   var checkCount = 0;
   updateStatusMessage(i, checkCount, total);
@@ -1450,8 +1594,8 @@ async function CheckDifferentGlyphs(onCompletion) {
   startLongRunning();
   let et = new ElapsedTimer();
 
-  hbf1.setScriptLang(HBScript.value, HBLang.value);
-  hbf2.setScriptLang(HBScript.value, HBLang.value);
+  hbf1.setScriptLang(inputScript.value, inputLanguage.value);
+  hbf2.setScriptLang(inputScript.value, inputLanguage.value);
 
   const tolerance = parseFloat(HBCGtolerance.value);
 
@@ -1520,8 +1664,8 @@ async function UpdateDifferences() {
 
   const checkGIDs = HBGIDs.checked;
 
-  hbf1.setScriptLang(HBScript.value, HBLang.value);
-  hbf2.setScriptLang(HBScript.value, HBLang.value);
+  hbf1.setScriptLang(inputScript.value, inputLanguage.value);
+  hbf2.setScriptLang(inputScript.value, inputLanguage.value);
 
   let checkCount = 0;
   updateStatusMessage(i, checkCount, total);
@@ -1799,8 +1943,8 @@ var api = {};
 function prepareApi() {
   api = {};
   api.transfer = {}
-  api.transfer.script = HBScript.value;
-  api.transfer.language = HBLang.value;
+  api.transfer.script = inputScript.value;
+  api.transfer.language = inputLanguage.value;
   api.transfer.direction = null;
   api.transfer.fontBlob1 = hbf1.fontBlob;
   api.transfer.fontBlob2 = hbf2.fontBlob;
@@ -1851,8 +1995,8 @@ function openFontForceFieldTool() {
 function acquireFontAndLists(w) {
   if (!w?.api?.transfer) return;
   const xfer = w.api.transfer;  // Use this as a conduit for values to be passed in here
-  HBScript.value = xfer.script;
-  HBLang.value   = xfer.language;
+  inputScript.value = xfer.script;
+  inputLanguage.value   = xfer.language;
   wordlist_filename = xfer.wordListFileName;
   
   // xfer.wordList
@@ -1945,8 +2089,8 @@ async function saveToLocalStorage() {
   try {
     ls.setItem('wordListFilename', wordlist_filename || '');
     ls.setItem('html_language', HTMLLang.value);
-    ls.setItem('harfbuzz_script', HBScript.value);
-    ls.setItem('harfbuzz_language', HBLang.value);
+    ls.setItem('harfbuzz_script', inputScript.value);
+    ls.setItem('harfbuzz_language', inputLanguage.value);
     ls.setItem('start_index', start_index);
     if (hbf1.fontNames) {
       ls.setItem('font1.name',    hbf1.fontNames.fullName);
@@ -2137,10 +2281,11 @@ function applyFontX(file, fontname, id, hbo, data) {
     () => {
       deleteFontByName(fontname);
       document.fonts.add(fontFace);
-      if (file) console.log('loaded '+file.name);
+      //--//if (file) console.log('loaded '+file.name);
       changeFontAscentDescent(fontname, '200%', '200%');
       fontsHaveChanged();
       updateListByField();
+      updateLanguage();
     },
     (err) => {
       console.error(err);
@@ -2179,6 +2324,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-07-24 n</p>
+</br>Tool Version: 2025-07-24 p</p>
 </body>
 </html>
