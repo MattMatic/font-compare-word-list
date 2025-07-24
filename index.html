@@ -114,21 +114,16 @@ th .dropdown-content{
 <script type="text/javascript" src="./js/fontname.min.js"></script>
 <script type="text/javascript" src="./js/flatbezier.js"></script>
 <script type='module' src="./js/glyphcompare.mjs" async></script>
-<script type='module'>
+<script type='module' async>
 import {CPaths64, GlyphCompareClass} from './js/glyphcompare.mjs';
 window.CPaths64 = CPaths64;
 window.GlyphCompareClass = GlyphCompareClass;
-</script>
-
-<script>
-"use strict";
-
 function onResourcesLoaded() {
-  loadFromLocalStorage();
+  window.loadFromLocalStorage();
   if ((window.opener !== null) && (window.opener.openFontCompareWordListTool)) {
-    acquireFontAndLists(window.opener);
+    window.acquireFontAndLists(window.opener);
   }
-  toggleHBIcons();
+  window.toggleHBIcons();
   /*
   import('./js/glyphcompare.mjs').then((module) => {
     GlyphCompare = module;
@@ -140,9 +135,14 @@ let harfBuzzModule; // not really needed with the hbjs wrapper
 createHarfBuzz().then(hbmodule=>{
   harfBuzzModule = hbmodule;
   window.hb = hbjs(hbmodule);
-  hbversion.innerHTML = hb.version_string();
+  window.hbversion.innerHTML = hb.version_string();
   onResourcesLoaded();
 });
+</script>
+
+<script>
+"use strict";
+
 
 //------------------------------
 // Drag and drop utilities
@@ -1849,7 +1849,7 @@ function openFontForceFieldTool() {
 }
 
 function acquireFontAndLists(w) {
-  if (!w.api || !w.api.transfer) return;
+  if (!w?.api?.transfer) return;
   const xfer = w.api.transfer;  // Use this as a conduit for values to be passed in here
   HBScript.value = xfer.script;
   HBLang.value   = xfer.language;
@@ -1995,8 +1995,9 @@ function setLastFontDetails(root, id) {
       + '<font size="-1">'+version+'</font></font>';
 }
 
+
 async function loadFromLocalStorage() {
-  //console.log('loadFromLocalStorage');//!!
+  if (window?.opener?.api?.transfer) return; // NOTE: hack as I have some nasty async issue that calls this AFTER the acquireFromTransfer has been executed
   const ls = window.localStorage;
   var _wl = ls.getItem('wordList');
   var buff;
@@ -2178,6 +2179,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-07-17 p</p>
+</br>Tool Version: 2025-07-24 n</p>
 </body>
 </html>
