@@ -416,10 +416,12 @@ export class GlyphCompareClass {
     let buffer = hb.createBuffer();
     buffer.addText(txt);
     buffer.guessSegmentProperties();
-    if ((typeof this.script === 'string') && (this.script.length > 0))
+    if ((typeof this.script === 'string') && (this.script.length > 0)) {
       buffer.setScript(this.script);
-    if ((typeof this.language === 'string') && (this.script.language > 0))
+    }
+    if ((typeof this.language === 'string') && (this.language.length > 0)) {
       buffer.setLanguage(this.language);
+    }
     hb.shape(this.font, buffer, features, 0);
     this.result = buffer.json(this.font);
     buffer.destroy();

@@ -195,7 +195,11 @@ function chooseFile(func) {
     func(file, e);
   }
   filein.click();
-  document.body.removeChild(filein);
+  try {
+    document.body.removeChild(filein);
+  } catch (e) {
+    // ignore
+  }
 }
 
 function cancel(e) {e.stopPropagation();e.preventDefault();}
@@ -443,8 +447,7 @@ function addEntry(lineNo, theWordEntry, displayValue) {
 }
 
 function updateListByIndex(idx) {
-  hbf1.setScriptLang(inputScript.value, inputLanguage.value);
-  hbf2.setScriptLang(inputScript.value, inputLanguage.value);
+  updateHarfBuzzScriptLanguage();
 
   const displayValue = window.getComputedStyle(fontOverlap).display;
   var table = document.getElementById('word_list')
@@ -959,9 +962,9 @@ class hbFont {
     var buffer = hb.createBuffer();
     buffer.addText(txt);
     buffer.guessSegmentProperties();
-    if (this.script && (this.script.length > 0))
+    if ((typeof this.script === 'string') && (this.script.length > 0))
       buffer.setScript(this.script || 'latn');
-    if (this.lang && (this.lang.length > 0))
+    if ((typeof this.lang === 'string') && (this.lang.length > 0))
       buffer.setLanguage(this.lang);
     hb.shape(this.font, buffer, this.features);
     const json = buffer.json(this.font);
@@ -1088,6 +1091,7 @@ class hbFont {
   genSVGcombined(txt, hb2, hideOverlap) {
     this.svgData = '';
     let svg = '';
+    if (!this.gc) return '';
     let jsonThis = this.gc.shape(txt, this.features);
     let p64This = this.gc.toPath(jsonThis);
     let jsonThat = hb2.gc.shape(txt, this.features);
@@ -1383,8 +1387,7 @@ function updateLanguage() {
   // TODO: FEATURES
 
   document.documentElement.setAttribute('lang', HTMLLang.value);
-  hbf1.setScriptLang(inputScript.value, inputLanguage.value);
-  hbf2.setScriptLang(inputScript.value, inputLanguage.value);
+  updateHarfBuzzScriptLanguage();
 }
 
 function ClearCheckList() {
@@ -1583,8 +1586,7 @@ async function CheckSimilar() {
   startLongRunning();
   const checkGIDs    = HBGIDs.checked;
 
-  hbf1.setScriptLang(inputScript.value, inputLanguage.value);
-  hbf2.setScriptLang(inputScript.value, inputLanguage.value);
+  updateHarfBuzzScriptLanguage();
 
   var checkCount = 0;
   updateStatusMessage(i, checkCount, total);
@@ -1638,8 +1640,7 @@ async function CheckDifferentGlyphs(onCompletion) {
   startLongRunning();
   let et = new ElapsedTimer();
 
-  hbf1.setScriptLang(inputScript.value, inputLanguage.value);
-  hbf2.setScriptLang(inputScript.value, inputLanguage.value);
+  updateHarfBuzzScriptLanguage();
 
   const tolerance = parseFloat(HBCGtolerance.value);
 
@@ -1695,6 +1696,13 @@ function CheckNotes() {
   window.alert('Checked '+count+' words');
 }
 
+function updateHarfBuzzScriptLanguage() {
+  const script = inputScript.value;
+  const language = inputLanguage.value;
+  hbf1.setScriptLang(script, language);
+  hbf2.setScriptLang(script, language);
+}
+
 async function UpdateDifferences() {
   let i = 0;
   const total = wordList.length;
@@ -1708,8 +1716,7 @@ async function UpdateDifferences() {
 
   const checkGIDs = HBGIDs.checked;
 
-  hbf1.setScriptLang(inputScript.value, inputLanguage.value);
-  hbf2.setScriptLang(inputScript.value, inputLanguage.value);
+  updateHarfBuzzScriptLanguage();
 
   let checkCount = 0;
   updateStatusMessage(i, checkCount, total);
@@ -2236,6 +2243,7 @@ updateListByIndex(1)
 
 function showOverlap(phrase, lineNo, event) {
   vectorDisplay.style.display = 'block';
+  updateHarfBuzzScriptLanguage();
   hbf1.genSVGcombined(phrase, hbf2, event.ctrlKey);
 }
 
@@ -2368,6 +2376,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-08-13 k</p>
+</br>Tool Version: 2025-08-13 m</p>
 </body>
 </html>
