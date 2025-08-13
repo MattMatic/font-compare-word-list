@@ -186,6 +186,18 @@ createHarfBuzz().then(hbmodule=>{
 //------------------------------
 // Drag and drop utilities
 //------------------------------
+
+function chooseFile(func) {
+  var filein = document.createElement('input');
+  filein.type = 'file';
+  filein.onchange = e => {
+    var file = e.target.files[0];
+    func(file, e);
+  }
+  filein.click();
+  document.body.removeChild(filein);
+}
+
 function cancel(e) {e.stopPropagation();e.preventDefault();}
 function patchDragDrop(ele, foo) {
   //const ele = document.getElementById(id);
@@ -202,6 +214,11 @@ function patchDragDrop(ele, foo) {
     const file = e.dataTransfer.files[0];
     ele.style.backgroundColor = null;
     foo(file, ele);
+  });
+  ele.addEventListener('mousedown', function(e) {
+    if (e.button === 2) {
+      chooseFile(foo);
+    }
   });
 }
 document.addEventListener('dragover', cancel, false);
@@ -564,6 +581,21 @@ function updateAlign() {
   updateCssStyle('.overlap', 'text-align', text_align);
 }
 
+function cssRulesIterate(func) {
+  const ruleList = document.styleSheets[0].cssRules;
+  for (const rule of ruleList) {
+    func(rule);
+  }
+}
+
+function setFontSize(size) {
+  cssRulesIterate(rule => {
+    if (rule.selectorText.startsWith('.test_')) {
+      rule.style.fontSize = size;
+    }
+  });
+}
+
 </script>
 </head>
 
@@ -770,7 +802,19 @@ function updateAlign() {
         </div>
       </div></div>
     </th>
-    <th width='26%' id='fontOneInfo'>Drag-and-Drop Font 1</th>
+    <th width='26%' id='fontOneInfoCell'>
+      <span id='fontOneInfo'>Drag-and-Drop Font 1</span>
+      <div class='dropdown'>
+        <button class='dropbtn'>…</button>
+        <div class='dropdown-content'>
+          <button class='dropbtn' style='width:50%' onclick='setFontSize("100%");'>100%</button></br>
+          <button class='dropbtn' style='width:50%' onclick='setFontSize("200%");'>200%</button></br>
+          <button class='dropbtn' style='width:50%' onclick='setFontSize("300%");'>300%</button></br>
+          <button class='dropbtn' style='width:50%' onclick='setFontSize("400%");'>400%</button></br>
+          <button class='dropbtn' style='width:50%' onclick='setFontSize("500%");'>500%</button></br>
+        </div>
+      </div>
+    </th>
     <th width='26%' id='fontTwoInfoCell'>
       <span id='fontTwoInfo'>Drag-and-Drop Font 2
       </span>
@@ -2324,6 +2368,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-07-24 p</p>
+</br>Tool Version: 2025-08-13 k</p>
 </body>
 </html>
