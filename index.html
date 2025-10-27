@@ -155,6 +155,12 @@ th .dropdown-content{
 <script type='module' src="./js/glyphcompare.mjs" async></script>
 <script type='module' async>
 import {CPaths64, GlyphCompareClass} from './js/glyphcompare.mjs';
+
+import * as opentype from './js/opentype.min.mjs';
+import Layout from './js/opentype.layout.gdef.mjs';
+window.opentype = opentype;
+window.Layout = Layout;
+
 window.CPaths64 = CPaths64;
 window.GlyphCompareClass = GlyphCompareClass;
 function onResourcesLoaded() {
@@ -691,13 +697,13 @@ function setFontSize(size) {
     <button class='dropbtn'>🔍Search</button>
     <div class='dropdown-content'>
       <table border=0 width='100%'>
-        <tr><th>Field:</th><td>
-          <input type='radio' name='regExpField' value='notes' checked><label for='notes'>Notes</label></br>
-          <input type='radio' name='regExpField' value='word'><label for='word'>Word</label></br>
+        <tr><th>Notes:</th><td><input type='text' name='regExpNotes' id='regExpNotes'/></td></tr>
+        <tr><th>Word:</th><td><input type='text' name='regExpWord' id='regExpWord'/></td></tr>
+        <tr><th>Glyph(s):</th><td><input type='text' name='regExpGlyph' id='regExpGlyph' title='Integer or string. Separate multiple with comma' disabled/>
         </td></tr>
-        <tr><th>Regular Expression:</th><td><input type='text' name='regExpression' id='regExpression'/>
-          ^=start, $=end, \=escape
+        <tr><th>GPOS:</th><td><input type='text' name='regExpGpos' id='regExpGpos' title='Integer or string. Separate multiple with comma' disabled/>
         </td></tr>
+        <tr><th></th><td>Regular Expression Hint: ^=start, $=end, \=escape</td>
         <tr><th>Check:</th><td>
           <input type='radio' name='regExpOp' value='check' checked><label for='check'>Check</label></br>
           <input type='radio' name='regExpOp' value='uncheck'><label for='uncheck'>Uncheck</label></br>
@@ -925,6 +931,8 @@ class hbFont {
     if (this.font) { this.font.destroy(); delete(this.font); }
     if (this.face) { this.face.destroy(); delete(this.face); }
     if (this.blob) { this.blob.destroy(); delete(this.blob); }
+    delete(this.otLayout);
+    delete(this.otFont);
     if (this.gc) this.gc.destroy();
     delete this.gc;
   }
@@ -945,6 +953,15 @@ class hbFont {
     this.blob = hb.createBlob(this.fontBlob);
     this.face = hb.createFace(this.blob, 0);
     this.font = hb.createFont(this.face);
+    const debgTable = this.face.reference_table("Debg");
+    if (debgTable) {
+      this.debugInfo = JSON.parse(new TextDecoder("utf8").decode(debgTable));
+      this.debugInfo = this.debugInfo["com.github.fonttools.feaLib"];
+    } else {
+      this.debugInfo = null;
+    }
+    this.otFont = opentype.parse(this.fontBlob);
+    this.otLayout = new Layout(this.otFont, 'GPOS');
 
     this.gc = new GlyphCompareClass();
     this.gc.setFontBlob(this.fontBlob);
@@ -970,6 +987,21 @@ class hbFont {
     const json = buffer.json(this.font);
     this.results.json = json;
     buffer.destroy();    
+  }
+  shapeWithTraceLimits(txt) {
+    if (!this.fontBlob) return;
+    var buffer = hb.createBuffer();
+    buffer.addText(txt);
+    buffer.guessSegmentProperties();
+    if ((typeof this.script === 'string') && (this.script.length > 0))
+      buffer.setScript(this.script || 'latn');
+    if ((typeof this.lang === 'string') && (this.lang.length > 0))
+      buffer.setLanguage(this.lang);
+    let trace = hb.shapeWithTraceLimits(this.font, buffer, this.features);
+    const json = buffer.json(this.font);
+    this.results.json = json;
+    buffer.destroy();
+    return trace;
   }
   compare(hb2, toleranceFunction) {
     // Returns bit field:
@@ -1089,20 +1121,24 @@ class hbFont {
     return this.svgData;
   }
   genSVGcombined(txt, hb2, hideOverlap) {
+    const haveThat = hb2.gc;
     this.svgData = '';
     let svg = '';
     if (!this.gc) return '';
     let jsonThis = this.gc.shape(txt, this.features);
     let p64This = this.gc.toPath(jsonThis);
-    let jsonThat = hb2.gc.shape(txt, this.features);
-    let p64That = hb2.gc.toPath(jsonThat);
-    const fopac = hideOverlap ? 1.0 : 0.25;
-    if (!hideOverlap) {
-      let p64Overlap = this.gc.overlapToCPaths64(hb2.gc);
-      svg += this.genSVGPaths(p64Overlap.paths64, {strokeColor:'#f08', strokeWidth:9, strokeOpacity:1, fillColor:'#f08', fillOpacity:1});
-      p64Overlap.destroy();
+    let fopac = 1.0;
+    if (hb2.gc) {
+      let jsonThat = hb2.gc.shape(txt, this.features);
+      let p64That = hb2.gc.toPath(jsonThat);
+      fopac = hideOverlap ? 1.0 : 0.25;
+      if (!hideOverlap) {
+        let p64Overlap = this.gc.overlapToCPaths64(hb2.gc);
+        svg += this.genSVGPaths(p64Overlap.paths64, {strokeColor:'#f08', strokeWidth:9, strokeOpacity:1, fillColor:'#f08', fillOpacity:1});
+        p64Overlap.destroy();
+      }
+      svg += this.genSVGPaths(p64That.paths64, {fillColor:'#e60', fillOpacity:fopac});
     }
-    svg += this.genSVGPaths(p64That.paths64, {fillColor:'#e60', fillOpacity:fopac});
     svg += this.genSVGPaths(p64This.paths64, {fillColor:'#008', fillOpacity:fopac});
     const xmin = -250;
     const ymin = -1800;
@@ -1116,6 +1152,34 @@ class hbFont {
       + ' viewBox="'+bbox+'">' +svg+'</svg>'; 
     updateSvg(svgResult, svg);
     return svg;
+  }
+  getGlyphName(gid) {
+    const glyphData = this.otFont?.glyphs?.get(gid);
+    if (!glyphData) return undefined;
+    return glyphData.name;
+  }
+  findGposIndexesFromRegExpList(regExpList) {
+    if (!regExpList) return null;
+    if (regExpList.length == 0) return null;
+    if (!this.debugInfo) return null;
+    const gpos = this.debugInfo['GPOS'];
+    if (!gpos || (gpos.length == 0)) return null;
+    let set = new Set();
+    for (const [key,dd] of Object.entries(gpos)) {
+      const name = dd[1];
+      for (let j=0; j<regExpList.length; j++) {
+        const re = regExpList[j];
+        if (re.test(name)) {
+          set.add(parseInt(key));
+          break;
+        }
+        if (re.test(key)) {
+          set.add(parseInt(key));
+          break;
+        }
+      }
+    }
+    return set;
   }
 }
 
@@ -1442,17 +1506,23 @@ function GetRadioValue(id) {
   return null;
 }
 
-function CheckmarkRegExp() {
+function CheckmarkRegExpNotesWord()
+{
   const exp = regExpression.value;
   const opField = GetRadioValue('regExpField');
   const opNotes = (opField === 'notes');
+  const opWord  = (opField === 'word');
 
   const opType = GetRadioValue('regExpOp');
-  const opCheck = (opType === 'check');
+  const opCheck   = (opType === 'check');
   const opUncheck = (opType === 'uncheck');
-  const opInvert = (opType === 'invert');
+  const opInvert  = (opType === 'invert');
   var re;
 
+  var count = 0;
+  const size = wordList.length;
+
+  // Look for Notes or Word
   try {
     re = new RegExp(exp);
   } catch (e) {
@@ -1460,9 +1530,6 @@ function CheckmarkRegExp() {
     return;
   }
 
-  var count = 0;
-
-  const size = wordList.length;
   for (let i=0; i<size; i++) {
     const we = wordList[i];
     var txt;
@@ -1473,16 +1540,201 @@ function CheckmarkRegExp() {
     if (re.test(txt)) {
       count++;
       if (opCheck)
-        wordList[i].setChecked(true);
+        we.setChecked(true);
       else if (opUncheck)
-        wordList[i].setChecked(false);
+        we.setChecked(false);
       else if (opInvert)
-        wordList[i].setChecked(!we.getChecked());
+        we.setChecked(!we.getChecked());
     }
   }
+
   updateCheckListCount();
   checkListHasChanged();
   updateListByField();
+  window.alert('Found '+count+' matches');
+}
+
+function findInExpList(expList, value) {
+  for (let i=0; i<expList.length; i++) {
+    const re = expList[i];
+    if (re.test(value)) return true;
+  }
+  return false;
+}
+
+function createRegExp(txt) {
+  if (!txt || (txt === '')) return null;
+  try {
+    re = new RegExp(txt);
+  } catch (e) {
+    window.alert(e.message);
+    return null;
+  }
+  return re;
+}
+
+function createRegExpList(txt) {
+  if (!txt || (txt === '')) return null;
+  const txtList = txt.split(',');
+  const expList = [];
+  for (let i=0; i<txtList.length; i++) {
+    try {
+      expList.push( new RegExp(txtList[i]) );
+    } catch (e) {
+      window.alert(e.message);
+      return null;
+    }
+  }
+  return expList;
+}
+
+function isHarfBuzzMessageImportant(msg) {
+  const set = [
+    'multiplying', 'multiplied',
+    'replacing',   'replaced',
+    'ligating',    'ligated',
+    'kerning',     'kerned',
+    'attaching',   'attached',
+    'positioning', 'positioned',
+    'deleting',    'deleted',
+  ];
+  const size = set.length;
+  for (let i=0;i<size;i++) {
+    if (msg.includes(set[i])) return true;
+  }
+  return false;
+}
+
+function findLastLookup(trace, index) {
+  let res = {};
+  if (index >= trace.gpos_point) res.stage = 'GPOS';
+  else if (index >= trace.gsub_point) res.stage = 'GSUB';
+  while (!res.lastIndex && (index > 0)) {
+    let debugInfo = null;
+    const message = trace[index].m;
+    const m3 = message.match(/^start lookup (\d+) feature '(\w+)'/);
+    const m4 = message.match(/^recursing to lookup (\d+)/);
+    if (m3) {
+      res.lastIndex = parseInt(m3[1], 10);
+    }
+    if (m4) {
+      res.lastIndex = parseInt(m4[1], 10);
+    }
+    index--;
+  }
+  res.index = index;
+  return res;
+}
+
+async function CheckmarkRegExp() {
+  // Glyph Name or GPOS table name
+  const opType = GetRadioValue('regExpOp');
+  const opCheck   = (opType === 'check');
+  const opUncheck = (opType === 'uncheck');
+  const opInvert  = (opType === 'invert');
+
+  var count = 0;
+  const size = wordList.length;
+  let et = new ElapsedTimer();
+
+  const expNote = createRegExp(regExpNotes.value);
+  const expWord = createRegExp(regExpWord.value);
+  const expListGlyph = createRegExpList(regExpGlyph.value);
+  const expListGpos  = createRegExpList(regExpGpos.value);
+  const gposSet = hbf1.findGposIndexesFromRegExpList(expListGpos);
+
+  startLongRunning();
+  for (let i=0; i<size; i++) {
+    const we = wordList[i];
+    const phrase = we.getWord();
+    let match = false;
+
+    let matchesNote = true;
+    if (expNote) matchesNote = expNote.test(we.getNote());
+    let matchesWord = true;
+    if (expWord) matchesWord = expWord.test(phrase);
+
+
+    let matchesGlyph = true;
+    let matchesGpos = true;
+
+    let trace = null;
+
+    if (expListGlyph || gposSet) {
+      if (!gposSet)
+        hbf1.shape(phrase)
+      else
+        trace = hbf1.shapeWithTraceLimits(phrase);
+
+      if (expListGlyph) {
+        // Check whether the glyphs name(s) or number(s) appear in the shaped output
+        matchesGlyph = false;
+        const json = hbf1.results.json;
+        for (let idx=0; idx<json.length; idx++) {
+          const x = json[idx];
+          // if (x.g) found in the list of expList...
+          if (findInExpList(expListGlyph, x.g)) {
+            matchesGlyph = true;
+            break;
+          }
+          const glyphName = hbf1.getGlyphName(x.g);
+          if (glyphName && findInExpList(expListGlyph, glyphName)) {
+            matchesGlyph = true;
+            break;
+          }
+        }
+      }
+
+      if (gposSet) {
+        // Search for GPOS table that had an effect on the output that is in expListGpos
+        const max = trace.length;
+        let j = max - 1;
+        const gpos_point = trace.gpos_point;
+        matchesGpos = false;
+        while (!matchesGpos && (j >= gpos_point)) {
+          const msg = trace[j]?.m;
+          if (msg && isHarfBuzzMessageImportant(msg)) {
+            // now find the start to extract the table number...
+            const lu = findLastLookup(trace, j);
+            j = lu.index;
+            if (lu.lastIndex) {
+              let li = parseInt(lu.lastIndex);
+              if (gposSet.has(li)) {
+                matchesGpos = true;
+              }
+            }
+          }
+          j--;
+        }
+      }
+    }
+
+    match = matchesNote && matchesWord && matchesGlyph && matchesGpos;
+
+    if (match) {
+      count++;
+      if (opCheck)
+        we.setChecked(true);
+      else if (opUncheck)
+        we.setChecked(false);
+      else if (opInvert)
+        we.setChecked(!we.getChecked());
+    }
+
+    if (et.elapsed()) {
+      updateStatusMessage(i, count, size);
+      //mapCountsToDisplay(bit_counts);
+      await scheduler.yield();      
+    }
+    if (AbortLongRunning) {
+      break;
+    }
+  }
+
+  updateCheckListCount();
+  checkListHasChanged();
+  updateListByField();
+  doneLongRunning();
   window.alert('Found '+count+' matches');
 }
 
@@ -2338,6 +2590,10 @@ function applyFontX(file, fontname, id, hbo, data) {
       fontsHaveChanged();
       updateListByField();
       updateLanguage();
+      if (hbo === hbf1) {
+        regExpGlyph.disabled = !hbf1.getGlyphName(0);
+        regExpGpos.disabled = !hbf1.debugInfo;
+      }
     },
     (err) => {
       console.error(err);
@@ -2376,6 +2632,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-08-13 m</p>
+</br>Tool Version: 2025-10-27 n</p>
 </body>
 </html>
