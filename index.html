@@ -426,6 +426,7 @@ function addEntry(lineNo, theWordEntry, displayValue) {
 
   var phrase = theWordEntry.getWord();
   hbf1.shape(phrase);
+  theWordEntry.updateGids(hbf1);  
   hbf2.shape(phrase);
   var diff = hbf1.compare(hbf2, tolCompare);
   theWordEntry.setDiff(diff);
@@ -690,6 +691,8 @@ function setFontSize(size) {
 
     <a href='#' onclick='openFontCompareTool();' title='Send checked words to HarfBuzz Font Compare Tool'>➜ Font Compare</a></br>
     <a href='#' onclick='openFontForceFieldTool();' title='Send checked words to Font Force Field Tool'>➜ Force Field</a></br>
+
+    <span id='gidGposAnalytics' hidden><a href='#' onclick='processChecklistGpos();' title='Process GPOS/GID data'>📈 Glyph/GPOS analytics</a></span></br>
     </div>
   </div>
 
@@ -986,7 +989,7 @@ class hbFont {
     hb.shape(this.font, buffer, this.features);
     const json = buffer.json(this.font);
     this.results.json = json;
-    buffer.destroy();    
+    buffer.destroy();
   }
   shapeWithTraceLimits(txt) {
     if (!this.fontBlob) return;
@@ -1158,6 +1161,14 @@ class hbFont {
     if (!glyphData) return undefined;
     return glyphData.name;
   }
+  getGposTableName(idx) {
+    if (!this.debugInfo) return null;
+    const gpos = this.debugInfo['GPOS'];
+    if (!gpos || (gpos.length == 0)) return null;
+    const debugData = gpos[idx];
+    if (!debugData) return null;
+    return debugData[1];
+  }
   findGposIndexesFromRegExpList(regExpList) {
     if (!regExpList) return null;
     if (regExpList.length == 0) return null;
@@ -1175,6 +1186,29 @@ class hbFont {
         }
         if (re.test(key)) {
           set.add(parseInt(key));
+          break;
+        }
+      }
+    }
+    return set;
+  }
+  findGidIndexesFromRegExpList(regExpList) {
+    if (!regExpList) return null;
+    if (regExpList.length == 0) return null;
+    let set = new Set();
+    const max = this.otFont?.glyphs?.length;
+    if (!max) return null;
+    for (let gid=0; gid<max; gid++) {
+      const name = this.getGlyphName(gid);
+      const gidString = String(gid);
+      for (let j=0; j<regExpList.length; j++) {
+        const re = regExpList[j];
+        if (re.test(name)) {
+          set.add(gid);
+          break;
+        }
+        if (re.test(gidString)) {
+          set.add(gid);
           break;
         }
       }
@@ -1202,6 +1236,10 @@ class wordEntryClass {
   getNote()     { return this.note; }
   getDiff()     { return this.diff; }
   setDiff(diff) { this.diff = diffValueToUnicode(diff); }
+  setGposData(gpd) { this.gposData = gpd; }
+  getGposData() { return this.gposData; }
+  setGidData(gids) { this.gidData = gids; }
+  getGidData() { return this.gidData; }
   // The line for the check list file output
   getLine() {
     var txt = this.word + '\t' + (this.note || '') + '\t' + (this.diff || '');
@@ -1215,8 +1253,10 @@ class wordEntryClass {
     // and append
     this.note = diffValueToNote(this.note, diffs);
   }
-  removeDifferenceArea() {
+  cacheClear() {
     delete this.diffArea;
+    delete this.gposData;
+    delete this.gidData;
   }
   calcDifferenceArea(hbf1, hbf2) {
     hbf1.shapeGlyphCompare(this.word);
@@ -1232,6 +1272,17 @@ class wordEntryClass {
     if (typeof this.diffArea !== 'undefined') return this.diffArea;
     return this.calcDifferenceArea(hbf1, hbf2);
   }
+  updateGids(hbo) {
+    if (this.gidData) return;
+    const json = hbo.results.json;
+    if (!json) return;
+    let gids = new Set();
+    for (let idx=0; idx<json.length; idx++) {
+      const x = json[idx];
+      gids.add(x.g);
+    }
+    this.gidData = gids;
+  }
 }
 
 var wordList = []; // An array of wordEntry objects
@@ -1239,7 +1290,7 @@ var wordList = []; // An array of wordEntry objects
 function fontsHaveChanged() {
   const size = wordList.length;
   for (let i=0; i<size; i++) {
-    wordList[i].removeDifferenceArea();
+    wordList[i].cacheClear();
   }
 }
 
@@ -1506,54 +1557,6 @@ function GetRadioValue(id) {
   return null;
 }
 
-function CheckmarkRegExpNotesWord()
-{
-  const exp = regExpression.value;
-  const opField = GetRadioValue('regExpField');
-  const opNotes = (opField === 'notes');
-  const opWord  = (opField === 'word');
-
-  const opType = GetRadioValue('regExpOp');
-  const opCheck   = (opType === 'check');
-  const opUncheck = (opType === 'uncheck');
-  const opInvert  = (opType === 'invert');
-  var re;
-
-  var count = 0;
-  const size = wordList.length;
-
-  // Look for Notes or Word
-  try {
-    re = new RegExp(exp);
-  } catch (e) {
-    window.alert(e.message);
-    return;
-  }
-
-  for (let i=0; i<size; i++) {
-    const we = wordList[i];
-    var txt;
-    if (opNotes)
-      txt = we.getNote();
-    else
-      txt = we.getWord();
-    if (re.test(txt)) {
-      count++;
-      if (opCheck)
-        we.setChecked(true);
-      else if (opUncheck)
-        we.setChecked(false);
-      else if (opInvert)
-        we.setChecked(!we.getChecked());
-    }
-  }
-
-  updateCheckListCount();
-  checkListHasChanged();
-  updateListByField();
-  window.alert('Found '+count+' matches');
-}
-
 function findInExpList(expList, value) {
   for (let i=0; i<expList.length; i++) {
     const re = expList[i];
@@ -1590,13 +1593,16 @@ function createRegExpList(txt) {
 
 function isHarfBuzzMessageImportant(msg) {
   const set = [
-    'multiplying', 'multiplied',
+    // GSUB operations
     'replacing',   'replaced',
+    'deleting',    'deleted',
+    'multiplying', 'multiplied',
     'ligating',    'ligated',
+
+    // GPOS operations
     'kerning',     'kerned',
     'attaching',   'attached',
     'positioning', 'positioned',
-    'deleting',    'deleted',
   ];
   const size = set.length;
   for (let i=0;i<size;i++) {
@@ -1626,6 +1632,159 @@ function findLastLookup(trace, index) {
   return res;
 }
 
+function extractGposData(trace) {
+  if (!trace || !trace.gpos_point) return null;
+  let idx = trace.gpos_point;
+  let gposTable;
+  const max = trace.length;
+  const res = [];
+  while (idx < max) {
+    const tr = trace[idx];
+    const msg = tr?.m;
+    const m3 = msg.match(/^start lookup (\d+) feature '(\w+)'/);
+    const m4 = msg.match(/^recursing to lookup (\d+)/);
+    if (m3) { gposTable = parseInt(m3[1], 10); }
+    if (m4) { gposTable = parseInt(m4[1], 10); }
+
+    if (!m3 && !m4) {
+      // Pull out glyph index figures to establish which GIDs affected
+      // Scan for ' at ...' in the tr.m field
+      var sets = msg.match(/ glyph at [\d,]+/g);
+      if (sets) {
+        if (!res[gposTable])
+          res[gposTable] = new Set();
+        let i = 0;
+        while (i < sets.length) {
+          const indices = sets[i].match(/\d+/g);
+          let j = 0;
+          while (j < indices.length) {
+            const n = parseInt(indices[j], 10);
+            res[gposTable].add(tr?.t[n]?.g);
+            j++;
+          }
+          i++;
+        }
+      }
+    }
+    idx++;
+  }
+  return res;
+}
+
+// Build array of [GID][GPOS] = count
+function addToGposGrid(grid, gposData, phrase) {
+  if (!gposData) return;
+  if (!grid.gpos) grid.gpos = []; // A list of all the GIDs in the output
+  if (!grid.gids) grid.gids = [];
+  gposData.forEach( function(item, gposIndex) {
+    if (!grid.gpos[gposIndex]) grid.gpos[gposIndex] = 0;
+    grid.gpos[gposIndex]++;
+
+    item.forEach( function(item) {
+      if (!grid.gids[item]) grid.gids[item] = 0;
+      grid.gids[item]++;
+
+      if (!grid[item]) grid[item] = [];
+      if (!grid[item][gposIndex]) grid[item][gposIndex] = 0;
+      grid[item][gposIndex]++;
+    });
+  });
+  return grid;
+}
+
+async function processChecklistGpos() {
+  const size = wordList.length;
+  let et = new ElapsedTimer();
+  gposGrid = [];
+  window.gposGrid = gposGrid;
+  let count = 0;
+  let aborted = false;
+
+  startLongRunning();
+  for (let i=0; i<size; i++) {
+    const we = wordList[i];
+    if (we.getChecked()) {
+      const phrase = we.getWord();
+      if (!we.getGposData()) {
+        let trace = hbf1.shapeWithTraceLimits(phrase);
+        we.updateGids(hbf1);
+        we.setGposData(extractGposData(trace));
+      }
+      addToGposGrid(gposGrid, we.getGposData(), phrase);
+      count++;
+    }
+    if (et.elapsed()) {
+      updateStatusMessage(i, 0, size);
+      //mapCountsToDisplay(bit_counts);
+      await scheduler.yield();      
+    }
+    if (AbortLongRunning) {
+      aborted = true;
+      break;
+    }
+  } 
+  doneLongRunning();
+
+  if (aborted) return;
+  if (!count) {
+    window.alert('Nothing checked!');
+    return;
+  }
+
+  let html = 'GID/GPOS analytics\r\n\r\n';
+
+  const gposSet = gposGrid.gpos;
+  if (!gposSet) return;
+  html += '"GID","GlyphName"';
+  gposSet.forEach( function(item, gpos) {
+    const gposName = hbf1.getGposTableName(gpos);
+    if (gposName)
+      html += `,"${gpos}:${gposName}"`;
+    else
+      html += `,${gpos}`;
+  });
+  html += `,"TOTAL"`;
+  html += '\r\n';
+
+  gposGrid.forEach( function(gidItem, gid) {
+    const gidName = hbf1.getGlyphName(gid);
+    html += `${gid}`;
+    if (gidName)
+      html += `,"${gidName}"`;
+    else
+      html += `,`;
+
+    gposSet.forEach( function(gposItem, gpos) {
+      const gidCount = gidItem[gpos];
+      if (gidCount)
+        html += `,${gidCount}`;
+      else
+        html += `,`;
+    });
+
+    html += `,${gposGrid.gids[gid]}`;
+    html += '\r\n';
+  });
+
+  html += '"TOTAL",';
+  gposSet.forEach( function(item, gpos) {
+    html += `,${item}`;
+  });
+  html += '\r\n';
+
+  // Add the Font Details
+  html += '\r\n';
+  html += `"FONT","${hbf1.fontNames.fullName}","${hbf1.fontNames.version}"`;
+
+  // Add the Word List stats
+  html += '\r\n';
+  html += `"WORDLIST",${wordlist_filename}\r\n`;
+  html += `"CHECKED",${getWordCheckCount()}`;
+
+  saveTextToFile(html, 'Glyph-GPOS-Analytics.'+DateTimeForFilename()+'.txt');
+}
+
+
 async function CheckmarkRegExp() {
   // Glyph Name or GPOS table name
   const opType = GetRadioValue('regExpOp');
@@ -1640,8 +1799,15 @@ async function CheckmarkRegExp() {
   const expNote = createRegExp(regExpNotes.value);
   const expWord = createRegExp(regExpWord.value);
   const expListGlyph = createRegExpList(regExpGlyph.value);
+  const gidSet = hbf1.findGidIndexesFromRegExpList(expListGlyph);
   const expListGpos  = createRegExpList(regExpGpos.value);
   const gposSet = hbf1.findGposIndexesFromRegExpList(expListGpos);
+
+  if (!expNote && !expWord && !expListGlyph && !gposSet) {
+    window.alert('Please fill in at least one field!');
+    return;
+  }
+
 
   startLongRunning();
   for (let i=0; i<size; i++) {
@@ -1661,14 +1827,25 @@ async function CheckmarkRegExp() {
     let trace = null;
 
     if (expListGlyph || gposSet) {
-      if (!gposSet)
-        hbf1.shape(phrase)
-      else
-        trace = hbf1.shapeWithTraceLimits(phrase);
+      if (!gposSet) {
+        // Straight shape to get gids
+        if (!we.getGidData()) {
+          hbf1.shape(phrase)
+          we.updateGids(hbf1);
+        }
+      } else {
+        // Full trace to extract GPOS table data as well as gids
+        if (!we.getGposData()) {
+          trace = hbf1.shapeWithTraceLimits(phrase);
+          we.updateGids(hbf1);
+          we.setGposData(extractGposData(trace));
+        }
+      }
 
       if (expListGlyph) {
         // Check whether the glyphs name(s) or number(s) appear in the shaped output
         matchesGlyph = false;
+        /*
         const json = hbf1.results.json;
         for (let idx=0; idx<json.length; idx++) {
           const x = json[idx];
@@ -1683,14 +1860,22 @@ async function CheckmarkRegExp() {
             break;
           }
         }
+        */
+        const gids = we.getGidData();
+        gids.forEach( function(key) {
+          if (!matchesGlyph && gidSet.has(key)) {
+            matchesGlyph = true;
+          }
+        });
       }
 
       if (gposSet) {
         // Search for GPOS table that had an effect on the output that is in expListGpos
+        matchesGpos = false;
+        /*
         const max = trace.length;
         let j = max - 1;
         const gpos_point = trace.gpos_point;
-        matchesGpos = false;
         while (!matchesGpos && (j >= gpos_point)) {
           const msg = trace[j]?.m;
           if (msg && isHarfBuzzMessageImportant(msg)) {
@@ -1706,6 +1891,13 @@ async function CheckmarkRegExp() {
           }
           j--;
         }
+        */
+        const gposData = we.getGposData();
+        gposData.forEach( function(item, index) {
+          if (gposSet.has(index)) {
+            matchesGpos = true;
+          }
+        });
       }
     }
 
@@ -1848,6 +2040,7 @@ async function CheckSimilar() {
   for (let i=0; i<total; i++) {
     const phrase = wordList[i].getWord();
     hbf1.shape(phrase);
+    wordList[i].updateGids(hbf1);
     hbf2.shape(phrase);
     var diff = hbf1.compare(hbf2, tolCompare);
     updateBitCounts(bit_counts, diff);
@@ -1978,6 +2171,7 @@ async function UpdateDifferences() {
   for (let i=0; i<total; i++) {
     const phrase = wordList[i].getWord();
     hbf1.shape(phrase);
+    wordList[i].updateGids(hbf1);
     hbf2.shape(phrase);
     var diff = hbf1.compare(hbf2, tolCompare);
     const theSame = ((diff == 1) && checkGIDs) || (diff == 0) || (diff == 64);
@@ -2335,6 +2529,15 @@ function DateTimeForFilename() {
          d.slice(11,13)+d.slice(14,16)+d.slice(17,19);
 }
 
+function saveTextToFile(txt, filename) {
+  var bb = new Blob([txt], {type: 'text/plain;charset=utf-8'});
+  var a = document.createElement('a');
+  a.download = filename;
+  a.href = window.URL.createObjectURL(bb);
+  a.target='_blank';
+  a.click();
+}
+
 function DownloadCheckList() {
   var txt = '';
   var i = 0;
@@ -2344,13 +2547,7 @@ function DownloadCheckList() {
     }
     i++;
   }
-  var bb = new Blob([txt], {type: 'text/plain;charset=utf-8'});
-  var a = document.createElement('a');
-  a.download = 'CheckList.'+DateTimeForFilename()+'.txt';
-  a.href = window.URL.createObjectURL(bb);
-  a.target='_blank';
-  a.click();
-  //document.body.removeChild(a);
+  saveTextToFile(txt, 'CheckList.'+DateTimeForFilename()+'.txt');
 }
 
 
@@ -2591,8 +2788,12 @@ function applyFontX(file, fontname, id, hbo, data) {
       updateListByField();
       updateLanguage();
       if (hbo === hbf1) {
-        regExpGlyph.disabled = !hbf1.getGlyphName(0);
-        regExpGpos.disabled = !hbf1.debugInfo;
+        //NOTE: if debug is not available, we can still use gid # and gpos table #
+        //regExpGlyph.disabled = !hbf1.getGlyphName(0);
+        //regExpGpos.disabled = !hbf1.debugInfo;
+        regExpGlyph.disabled = false;
+        regExpGpos.disabled = false;
+        gidGposAnalytics.hidden = false;
       }
     },
     (err) => {
@@ -2632,6 +2833,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-10-27 n</p>
+</br>Tool Version: 2025-10-28 i</p>
 </body>
 </html>
