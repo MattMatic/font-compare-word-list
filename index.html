@@ -1884,20 +1884,14 @@ async function CheckmarkRegExp() {
   for (let i=0; i<size; i++) {
     const we = wordList[i];
     const phrase = we.getWord();
-    let match = false;
+    let match = true;
 
-    let matchesNote = true;
-    if (expNote) matchesNote = expNote.test(we.getNote());
-    let matchesWord = true;
-    if (expWord) matchesWord = expWord.test(phrase);
-
-
-    let matchesGlyph = true;
-    let matchesGpos = true;
+    if (match && expNote) match = expNote.test(we.getNote());
+    if (match && expWord) match = expWord.test(phrase);
 
     let trace = null;
 
-    if (expListGlyph || gposSet) {
+    if (match && (expListGlyph || gposSet)) {
       if (!gposSet) {
         // Straight shape to get gids
         if (!we.getGidData()) {
@@ -1913,66 +1907,30 @@ async function CheckmarkRegExp() {
         }
       }
 
-      if (expListGlyph) {
+      if (match && expListGlyph) {
         // Check whether the glyphs name(s) or number(s) appear in the shaped output
-        matchesGlyph = false;
-        /*
-        const json = hbf1.results.json;
-        for (let idx=0; idx<json.length; idx++) {
-          const x = json[idx];
-          // if (x.g) found in the list of expList...
-          if (findInExpList(expListGlyph, x.g)) {
-            matchesGlyph = true;
-            break;
-          }
-          const glyphName = hbf1.getGlyphName(x.g);
-          if (glyphName && findInExpList(expListGlyph, glyphName)) {
-            matchesGlyph = true;
-            break;
-          }
-        }
-        */
         const gids = we.getGidData();
+        let matchesGlyph = false;
         gids.forEach( function(key) {
           if (!matchesGlyph && gidSet.has(key)) {
             matchesGlyph = true;
           }
         });
+        if (!matchesGlyph) match = false;
       }
 
-      if (gposSet) {
+      if (match && gposSet) {
         // Search for GPOS table that had an effect on the output that is in expListGpos
-        matchesGpos = false;
-        /*
-        const max = trace.length;
-        let j = max - 1;
-        const gpos_point = trace.gpos_point;
-        while (!matchesGpos && (j >= gpos_point)) {
-          const msg = trace[j]?.m;
-          if (msg && isHarfBuzzMessageImportant(msg)) {
-            // now find the start to extract the table number...
-            const lu = findLastLookup(trace, j);
-            j = lu.index;
-            if (lu.lastIndex) {
-              let li = parseInt(lu.lastIndex);
-              if (gposSet.has(li)) {
-                matchesGpos = true;
-              }
-            }
-          }
-          j--;
-        }
-        */
+        let matchesGpos = false;
         const gposData = we.getGposData();
         gposData.forEach( function(item, index) {
           if (gposSet.has(index)) {
             matchesGpos = true;
           }
         });
+        if (!matchesGpos) match = false;
       }
     }
-
-    match = matchesNote && matchesWord && matchesGlyph && matchesGpos;
 
     if (match) {
       count++;
@@ -2904,6 +2862,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-10-28 o</p>
+</br>Tool Version: 2025-10-28 p</p>
 </body>
 </html>
