@@ -1178,15 +1178,24 @@ class hbFont {
     let set = new Set();
     for (const [key,dd] of Object.entries(gpos)) {
       const name = dd[1];
+      const keyInt = parseInt(key);
       for (let j=0; j<regExpList.length; j++) {
         const re = regExpList[j];
-        if (re.test(name)) {
-          set.add(parseInt(key));
-          break;
-        }
-        if (re.test(key)) {
-          set.add(parseInt(key));
-          break;
+        if (typeof re === 'object') {
+          if (re.test(name)) {
+            set.add(keyInt);
+            break;
+          }
+          if (re.test(key)) {
+            set.add(keyInt);
+            break;
+          }
+        } else
+        if (typeof re === 'number') {
+          if (re == keyInt) {
+            set.add(keyInt);
+            break;
+          }
         }
       }
     }
@@ -1203,13 +1212,21 @@ class hbFont {
       const gidString = String(gid);
       for (let j=0; j<regExpList.length; j++) {
         const re = regExpList[j];
-        if (re.test(name)) {
-          set.add(gid);
-          break;
-        }
-        if (re.test(gidString)) {
-          set.add(gid);
-          break;
+        if (typeof re === 'object') {
+          if (re.test(name)) {
+            set.add(gid);
+            break;
+          }
+          if (re.test(gidString)) {
+            set.add(gid);
+            break;
+          }
+        } else
+        if (typeof re === 'number') {
+          if (re == gid) {
+            set.add(gid);
+            break;
+          }
         }
       }
     }
@@ -1580,12 +1597,18 @@ function createRegExpList(txt) {
   if (!txt || (txt === '')) return null;
   const txtList = txt.split(',');
   const expList = [];
+  const isInteger = new RegExp('^[0-9]+$');
   for (let i=0; i<txtList.length; i++) {
-    try {
-      expList.push( new RegExp(txtList[i]) );
-    } catch (e) {
-      window.alert(e.message);
-      return null;
+    const entry = txtList[i];
+    if (isInteger.test(entry)) {
+      expList.push(parseInt(entry));
+    } else {
+      try {
+        expList.push( new RegExp(entry) );
+      } catch (e) {
+        window.alert(e.message);
+        return null;
+      }
     }
   }
   return expList;
@@ -1734,6 +1757,7 @@ async function processChecklistGpos() {
   let html = 'GID/GPOS analytics\r\n\r\n';
 
   const gposSet = gposGrid.gpos;
+  const gidSet  = gposGrid.gids;
   if (!gposSet) return;
   html += '"GID","GlyphName"';
   gposSet.forEach( function(item, gpos) {
@@ -1780,6 +1804,53 @@ async function processChecklistGpos() {
   html += '\r\n';
   html += `"WORDLIST",${wordlist_filename}\r\n`;
   html += `"CHECKED",${getWordCheckCount()}`;
+
+  html += '\r\n\r\n';
+  // Sorted outputs for GID and GPOS
+  let arr = [];
+
+  html += '"----------------"\r\n';
+  html += '"GPOS Count Order"\r\n';
+  html += '"----------------"\r\n';
+  html += '"GPOS","TableName","Count"\r\n';
+  gposSet.forEach((v,k)=> arr.push({key:k, val:v}));
+  arr.sort((a,b) => {
+    if (a.val > b.val) return -1;
+    if (a.val < b.val) return 1;
+    if (a.key > b.key) return 1;
+    if (a.key < b.key) return -1;
+    return 0;
+  });
+  arr.forEach((v) => {
+    html += `${v.key},`;
+    const gposName = hbf1.getGposTableName(v.key);
+    if (gposName)
+      html += `"${gposName}"`;
+    html += `,${v.val}\r\n`;
+  });
+  html += '\r\n';
+
+  html += '"---------------"\r\n';
+  html += '"GID Count Order"\r\n';
+  html += '"---------------"\r\n';
+  html += '"GID","GlyphName","Count"\r\n';
+  arr = [];
+  gidSet.forEach((v,k) => arr.push({key:k, val:v}));
+  arr.sort((a,b) => {
+    if (a.val > b.val) return -1;
+    if (a.val < b.val) return 1;
+    if (a.key > b.key) return 1;
+    if (a.key < b.key) return -1;
+    return 0;
+  });
+  arr.forEach((v) => {
+    html += `${v.key},`;
+    const gidName = hbf1.getGlyphName(v.key);
+    if (gidName)
+      html += `"${gidName}"`;
+    html += `,${v.val}\r\n`;
+  });
+  html += '\r\n';
 
   saveTextToFile(html, 'Glyph-GPOS-Analytics.'+DateTimeForFilename()+'.txt');
 }
@@ -2833,6 +2904,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-10-28 i</p>
+</br>Tool Version: 2025-10-28 o</p>
 </body>
 </html>
