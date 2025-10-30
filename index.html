@@ -333,20 +333,23 @@ function BuildNoteHtml(n) {
 
 function BuildDifference(n, phrase) {
   if (!HBCGlive.checked) return '';
-  let da = wordList[n].getDifferenceArea();
-  if (typeof da === 'undefined') da = wordList[n].calcDifferenceArea(hbf1, hbf2);
+  const we = wordList[n];
+  let da = we.getDifferenceArea();
+  if (typeof da === 'undefined') da = we.calcDifferenceArea(hbf1, hbf2);
   if (da === 0) return '';
-  return da;
+  let txt = `Diff:${da}</br><font size=-1>Adv:${we.totalAdv[1]-we.totalAdv[2]}=${Math.round(we.totalAdv[0]*1000)/10}%</font>`;
+  return txt;
 }
 
 const hb_icons = {
   identical: ['&#x2705;' , '✅',  64],     // Green tick
   count    : ['&#x1F7E5;', '🟥', 128],     // Red
+  total    : ['&#x1F7E0;', '🟠',  32],     // Orange circle
   cluster  : ['&#x1F7E8;', '🟨',   2],     // Yellow
   advance  : ['&#x1F7E6;', '🟦',   8],     // Blue
   offset   : ['&#x1F7EA;', '🟪',   4],     // Purple
   gid      : ['&#x2b1c;' , '⬜',   1],     // White
-  reg_exp  : new RegExp('[✅🟥🟨🟦🟪⬜]', 'g')
+  reg_exp  : new RegExp('[✅🟥🟠🟨🟦🟪⬜]', 'g')
 };
 
 function diffFieldToText(diff) {
@@ -358,6 +361,7 @@ function diffFieldToText(diff) {
   if (0 != (diff & hb_icons.cluster[2]))  res = res + hb_icons.cluster[0] + sep;
   if (0 != (diff & hb_icons.advance[2]))  res = res + hb_icons.advance[0] + sep;
   if (0 != (diff & hb_icons.offset[2]))   res = res + hb_icons.offset[0]  + sep;
+  if (0 != (diff & hb_icons.total[2]))    res = res + hb_icons.total[0] + sep;
   //if (0 != (diff & hb_icons.gid[2]))   res = res + hb_icons.gid[0]     ;//+ "</br>";
   return res;
 }
@@ -370,6 +374,7 @@ function diffValueToUnicode(diff) {
   if (0 != (diff & hb_icons.cluster[2]))   res = res + hb_icons.cluster[1];
   if (0 != (diff & hb_icons.advance[2]))   res = res + hb_icons.advance[1];
   if (0 != (diff & hb_icons.offset[2]))   res = res + hb_icons.offset[1];
+  if (0 != (diff & hb_icons.total[2]))    res = res + hb_icons.total[1];
   //if (0 != (diff & hb_icons.gid[2]))   res = res + hb_icons.gid[1];
   return res;
 }
@@ -416,6 +421,7 @@ tolCompare = generateToleranceCompareFunction(null);
 function updateTolerance() {
   var tolerance = HBCC_tolerance.value;
   tolCompare = generateToleranceCompareFunction(tolerance);
+  updateListByField();
 }
 
 function addEntry(lineNo, theWordEntry, displayValue) {
@@ -749,11 +755,15 @@ function setFontSize(size) {
                 <td align='right'><span id='HBCC_clusters_no'></span></td>
               </tr>
               <tr>
-                <td><input type='checkbox' id='HBCC_advance'>🟦Different Advance</input></td>
+                <td><input type='checkbox' id='HBCC_advance'>🟦Different Advance *</input></td>
                 <td align='right'><span id='HBCC_advance_no'></span></td>
               </tr>
               <tr>
-                <td><input type='checkbox' id='HBCC_offset'>🟪Different Offset</input></td>
+                <td><input type='checkbox' id='HBCC_total'>🟠Total Advance *</input></td>
+                <td align='right'><span id='HBCC_total_no'></span></td>
+              </tr>
+              <tr>
+                <td><input type='checkbox' id='HBCC_offset'>🟪Different Offset *</input></td>
                 <td align='right'><span id='HBCC_offset_no'></span></td>
               </tr>
               <tr>
@@ -765,7 +775,7 @@ function setFontSize(size) {
                 <td align='right'><span id='HBCC_identical_no'></span></td>
               </tr>
               <tr>
-                <td><label for='HBCC_tolerance'>Tolerance:</label><input type='text' id='HBCC_tolerance' oninput='updateTolerance();' title='Tolerance for Offset & Advance&#13;&#10; - either a value in designUnits (e.g. 10), or a percentage (e.g. 10%)'></td>
+                <td><label for='HBCC_tolerance'>Tolerance:(*)</label><input type='text' id='HBCC_tolerance' oninput='updateTolerance();' title='Tolerance for Offset & Advance&#13;&#10; - either a value in designUnits (e.g. 10), or a percentage (e.g. 10%)' value='5%'></td>
               </tr>
             </table>
           </td>
@@ -779,7 +789,12 @@ function setFontSize(size) {
           <td>
             <font color='red'>EXPERIMENTAL</font></br>
             <input type='text' id='HBCGtolerance' title='1000s designUnits^2 area tolerance' value='20'></input></br>
-            <input type='checkbox' id='HBCGlive' onchange='updateHBCGlive();'>Show in table</input>
+          </td>
+        </tr>
+        <tr>
+        <th></th>  
+          <td>
+            <input type='checkbox' id='HBCGlive' onchange='updateHBCGlive();'>Show data in table</input>
           </td>
         </tr>
       </table>
@@ -989,6 +1004,9 @@ class hbFont {
     hb.shape(this.font, buffer, this.features);
     const json = buffer.json(this.font);
     this.results.json = json;
+    let totalAdv = 0;
+    this.results.json.forEach(function(g) { totalAdv += g.ax; });
+    this.results.totalAdv = totalAdv;
     buffer.destroy();
   }
   shapeWithTraceLimits(txt) {
@@ -1003,6 +1021,9 @@ class hbFont {
     let trace = hb.shapeWithTraceLimits(this.font, buffer, this.features);
     const json = buffer.json(this.font);
     this.results.json = json;
+    let totalAdv = 0;
+    this.results.json.forEach(function(g) { totalAdv += g.ax; });
+    this.results.totalAdv = totalAdv;
     buffer.destroy();
     return trace;
   }
@@ -1012,6 +1033,7 @@ class hbFont {
     // 2 = Cluster different
     // 4 = Offset different
     // 8 = Advance different (e.g. kerning)
+    // 32 = Overall Advance different
     // 128 = different length
     // 64  = exact
     if (!toleranceFunction) {
@@ -1055,9 +1077,9 @@ class hbFont {
       if (toleranceFunction(g1.dy, g2.dy)) res |= 4;
       if (toleranceFunction(g1.ax, g2.ax)) res |= 8;
       if (toleranceFunction(g1.ay, g2.ay)) res |= 8;
-
       idx++;
     }
+    if (toleranceFunction(this.results.totalAdv, hb2.results.totalAdv)) res |= 32;
     if (res === 0) res |= 64;
     return res;
   }
@@ -1172,31 +1194,36 @@ class hbFont {
   findGposIndexesFromRegExpList(regExpList) {
     if (!regExpList) return null;
     if (regExpList.length == 0) return null;
-    if (!this.debugInfo) return null;
-    const gpos = this.debugInfo['GPOS'];
-    if (!gpos || (gpos.length == 0)) return null;
+
     let set = new Set();
-    for (const [key,dd] of Object.entries(gpos)) {
-      const name = dd[1];
-      const keyInt = parseInt(key);
-      for (let j=0; j<regExpList.length; j++) {
-        const re = regExpList[j];
-        if (typeof re === 'object') {
-          if (re.test(name)) {
-            set.add(keyInt);
-            break;
-          }
-          if (re.test(key)) {
-            set.add(keyInt);
-            break;
-          }
-        } else
-        if (typeof re === 'number') {
-          if (re == keyInt) {
-            set.add(keyInt);
-            break;
+    if (this.debugInfo) {
+      const gpos = this.debugInfo['GPOS'];
+      if (!gpos || (gpos.length == 0)) return null;
+      for (const [key,dd] of Object.entries(gpos)) {
+        const name = dd[1];
+        const keyInt = parseInt(key);
+        for (let j=0; j<regExpList.length; j++) {
+          const re = regExpList[j];
+          if (typeof re === 'object') {
+            if (re.test(name)) {
+              set.add(keyInt);
+              break;
+            }
+            if (re.test(key)) {
+              set.add(keyInt);
+              break;
+            }
+          } else {
+            // Numbers handle separately
           }
         }
+      }
+    }
+    // Handle numeric GPOS table entries separately
+    for (let j=0; j<regExpList.length; j++) {
+      const re = regExpList[j];
+      if (typeof re === 'number') {
+        set.add(re);
       }
     }
     return set;
@@ -1271,6 +1298,7 @@ class wordEntryClass {
     this.note = diffValueToNote(this.note, diffs);
   }
   cacheClear() {
+    delete this.area;
     delete this.diffArea;
     delete this.gposData;
     delete this.gidData;
@@ -1282,6 +1310,14 @@ class wordEntryClass {
     let diffs = hbf1.compareOverlap(hbf2);
     if (diffs) da = Math.round(diffs.fill) / 1000.0;
     this.diffArea = da;
+    this.area = [];
+    this.area[1] = hbf1.gc.getArea();
+    this.area[2] = hbf2.gc.getArea();
+    this.area[0] = (this.area[1] - this.area[2]) / this.area[1]; // Ratio
+    this.totalAdv = [];
+    this.totalAdv[1] = hbf1.results.totalAdv;
+    this.totalAdv[2] = hbf2.results.totalAdv;
+    this.totalAdv[0] = (this.totalAdv[1] - this.totalAdv[2]) / this.totalAdv[1];
     return da;
   }
   getDifferenceArea() { return this.diffArea; }
@@ -1440,6 +1476,7 @@ function toggleHBIcons() {
     hb_icons.cluster[0]   + 'clu</br>'+
     hb_icons.advance[0]   + 'adv</br>'+
     hb_icons.offset[0]    + 'ofs</br>'+
+    hb_icons.total[0]     + 'tot</br>'+
     "</span>";
   HBIcons.hidden = !HBIcons.hidden;
 }
@@ -1874,7 +1911,7 @@ async function CheckmarkRegExp() {
   const expListGpos  = createRegExpList(regExpGpos.value);
   const gposSet = hbf1.findGposIndexesFromRegExpList(expListGpos);
 
-  if (!expNote && !expWord && !expListGlyph && !gposSet) {
+  if (!expNote && !expWord && !gidSet && !gposSet) {
     window.alert('Please fill in at least one field!');
     return;
   }
@@ -2022,6 +2059,7 @@ function updateBitCounts(t, bits) {
   updateBitCountsOne(t,bits,hb_icons.cluster[2]);
   updateBitCountsOne(t,bits,hb_icons.advance[2]);
   updateBitCountsOne(t,bits,hb_icons.offset[2]);
+  updateBitCountsOne(t,bits,hb_icons.total[2]);
   updateBitCountsOne(t,bits,hb_icons.gid[2]);
   updateBitCountsOne(t,bits,hb_icons.identical[2]);
 }
@@ -2031,6 +2069,7 @@ function mapCountsToDisplay(t) {
   HBCC_clusters_no.innerHTML  = t[hb_icons.cluster[2]] || '';
   HBCC_advance_no.innerHTML   = t[hb_icons.advance[2]] || '';
   HBCC_offset_no.innerHTML    = t[hb_icons.offset[2]] || '';
+  HBCC_total_no.innerHTML     = t[hb_icons.total[2]] || '';
   HBCC_gid_no.innerHTML       = t[hb_icons.gid[2]] || '';
   HBCC_identical_no.innerHTML = t[hb_icons.identical[2]] || '';
 }
@@ -2045,6 +2084,7 @@ async function CheckSimilar() {
   if (HBCC_clusters.checked)  bits |= hb_icons.cluster[2];
   if (HBCC_advance.checked)   bits |= hb_icons.advance[2];
   if (HBCC_offset.checked)    bits |= hb_icons.offset[2];
+  if (HBCC_total.checked)     bits |= hb_icons.total[2];
   if (HBCC_gid.checked)       bits |= hb_icons.gid[2];
   if (HBCC_identical.checked) bits |= hb_icons.identical[2];
 
@@ -2839,6 +2879,7 @@ function handleFontXDrop(file, fontname, id, hbo) {
   reader.onload = function(e) {
     applyFontX(file, fontname, id, hbo, reader.result);
     saveToLocalStorage();
+    updateTolerance();
   }
   reader.readAsArrayBuffer(file);
 }
@@ -2859,9 +2900,10 @@ patchDragDrop(fontTwoInfoCell, handleFontTwoDrop);
 
 showFontTwo(false);
 
+
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-10-28 p</p>
+</br>Tool Version: 2025-10-30 i</p>
 </body>
 </html>
