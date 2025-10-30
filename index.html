@@ -337,7 +337,7 @@ function BuildDifference(n, phrase) {
   let da = we.getDifferenceArea();
   if (typeof da === 'undefined') da = we.calcDifferenceArea(hbf1, hbf2);
   if (da === 0) return '';
-  let txt = `Diff:${da}</br><font size=-1>Adv:${we.totalAdv[1]-we.totalAdv[2]}=${Math.round(we.totalAdv[0]*1000)/10}%</font>`;
+  let txt = `Diff:${da}</br><font size=-1>Adv:${we?.totalAdv[1]-we?.totalAdv[2]}=${Math.round(we?.totalAdv[0]*1000)/10}%</font>`;
   return txt;
 }
 
@@ -387,22 +387,33 @@ function diffValueToNote(existingNote, diff) {
 
 var tolCompare;
 
+function differenceRatio(a, b) {
+  return (a-b) / ((a+b)/2);
+}
+
 function generateToleranceCompareFunction(tolerance) {
   var fn;
   if (tolerance && (tolerance !== '')) {
+    let gt = true;
+    if (tolerance.startsWith('<')) {
+      // Looking for less than
+      gt = false;
+      tolerance = tolerance.substr(1);
+    }
     if (tolerance.includes('%')) {
       const tol = parseFloat(tolerance) / 100;
+
       fn = function(a, b) {
-        if ((Math.abs(a-b) / ((a+b)/2)) > tol) {
-          return true;
+        if (Math.abs(differenceRatio(a, b)) > tol) {
+          return gt;
         }
-        return false;
+        return !gt;
       }
     } else {
       const diff = parseFloat(tolerance);
       fn = function(a,b) {
-        if (Math.abs(a-b) > diff) return true;
-        return false;
+        if (Math.abs(a-b) > diff) return gt;
+        return !gt;
       }
     }
   } else {
@@ -775,7 +786,7 @@ function setFontSize(size) {
                 <td align='right'><span id='HBCC_identical_no'></span></td>
               </tr>
               <tr>
-                <td><label for='HBCC_tolerance'>Tolerance:(*)</label><input type='text' id='HBCC_tolerance' oninput='updateTolerance();' title='Tolerance for Offset & Advance&#13;&#10; - either a value in designUnits (e.g. 10), or a percentage (e.g. 10%)' value='5%'></td>
+                <td><label for='HBCC_tolerance'>Tolerance:(*)</label><input type='text' id='HBCC_tolerance' oninput='updateTolerance();' title='Tolerance for Offset & Advance&#13;&#10; - either a value in designUnits (e.g. 10), or a percentage (e.g. 10%)&#13;&#10;Prefix with `<` for less than.' value='5%'></td>
               </tr>
             </table>
           </td>
@@ -843,8 +854,7 @@ function setFontSize(size) {
       </div>
     </th>
     <th width='26%' id='fontTwoInfoCell'>
-      <span id='fontTwoInfo'>Drag-and-Drop Font 2
-      </span>
+      <span id='fontTwoInfo'>Drag-and-Drop Font 2</span>
       <div class='dropdown'>
         <button class='dropbtn'>…</button>
         <div class='dropdown-content'>
@@ -1310,14 +1320,16 @@ class wordEntryClass {
     let diffs = hbf1.compareOverlap(hbf2);
     if (diffs) da = Math.round(diffs.fill) / 1000.0;
     this.diffArea = da;
-    this.area = [];
-    this.area[1] = hbf1.gc.getArea();
-    this.area[2] = hbf2.gc.getArea();
-    this.area[0] = (this.area[1] - this.area[2]) / this.area[1]; // Ratio
-    this.totalAdv = [];
-    this.totalAdv[1] = hbf1.results.totalAdv;
-    this.totalAdv[2] = hbf2.results.totalAdv;
-    this.totalAdv[0] = (this.totalAdv[1] - this.totalAdv[2]) / this.totalAdv[1];
+    if (hbf1.gc && hbf2.gc) {
+      this.area = [];
+      this.area[1] = hbf1.gc.getArea();
+      this.area[2] = hbf2.gc.getArea();
+      this.area[0] = (this.area[1] - this.area[2]) / this.area[1]; // Ratio
+      this.totalAdv = [];
+      this.totalAdv[1] = hbf1.results.totalAdv;
+      this.totalAdv[2] = hbf2.results.totalAdv;
+      this.totalAdv[0] = differenceRatio(hbf1.results.totalAdv, hbf2.results.totalAdv);
+    }
     return da;
   }
   getDifferenceArea() { return this.diffArea; }
@@ -2895,7 +2907,7 @@ function handleFontTwoDrop(file) {
 
 patchDragDrop(WordsDragDrop, handleWordsDrop);
 patchDragDrop(CheckDragDrop, handleCheckDrop);
-patchDragDrop(fontOneInfo, handleFontOneDrop);
+patchDragDrop(fontOneInfoCell, handleFontOneDrop);
 patchDragDrop(fontTwoInfoCell, handleFontTwoDrop);
 
 showFontTwo(false);
@@ -2904,6 +2916,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-10-30 i</p>
+</br>Tool Version: 2025-10-30 j</p>
 </body>
 </html>
