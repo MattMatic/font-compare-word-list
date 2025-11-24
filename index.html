@@ -1427,7 +1427,7 @@ function checkBothFontsLoaded() {
   if (!hbf2.fileDescription) res = false;
   if (hbf1.fileDescription === '') res = false;
   if (hbf2.fileDescription === '') res = false;
-  if (hbf1.fileDescription === hbf2.fileDescription) res = false;
+  //allow comparing debug & reuglar//if (hbf1.fileDescription === hbf2.fileDescription) res = false;
   if (!res)
   {
     window.alert('Please load two fonts to compare');
@@ -2916,6 +2916,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-10-30 j</p>
+</br>Tool Version: 2025-11-24 l</p>
 </body>
 </html>
