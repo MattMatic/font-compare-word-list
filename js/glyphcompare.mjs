@@ -85,8 +85,7 @@ export class CPaths64 {
   }
   // Return the bound box
   getBoundingBox() {
-    const result = bbox;
-    return result;
+    return this.bbox;
   }
   // Iterate through all paths and remove any that are smaller than `minArea`
   removeSmallAreas(minArea) {
@@ -422,12 +421,32 @@ export class GlyphCompareClass {
     if ((typeof this.language === 'string') && (this.language.length > 0)) {
       buffer.setLanguage(this.language);
     }
+
+/*--
     hb.shape(this.font, buffer, features, 0);
+--*/
+/*--Workaround for pre HarfBuzz 12.2.0 with Indic shaping--*/
+    const exports = hb.hooks.exports;
+    const addFunction = hb.hooks.addFunction;
+    const removeFunction = hb.hooks.removeFunction;
+    const utf8Decoder = hb.hooks.utf8Decoder;
+    const Module = hb.hooks.Module;    
+    var traceFunc = function(bufferPtr, fontPtr, messagePtr, user_data) {
+      return 1;
+    }
+    var traceFuncPtr = addFunction(traceFunc, 'iiiii');
+    exports.hb_buffer_set_message_func(buffer.ptr, traceFuncPtr, 0, 0);
+    hb.shape(this.font, buffer, features, 0);
+    removeFunction(traceFuncPtr);
+/*--*/
     this.result = buffer.json(this.font);
+    let totalAdv = 0;
+    this.result.forEach(function(g) { totalAdv += g.ax; });
+    this.result.totalAdv = totalAdv;
     buffer.destroy();
     return this.result;
   }
-  toPath(json) {
+  toPath(json, options) {
     let cpaths64 = new CPaths64();
     if (!json) json = this.result;
     let pos = {x:0, y:0};
@@ -440,6 +459,24 @@ export class GlyphCompareClass {
       glyph.destroy();
       pos.x += r.ax;
       pos.y += r.ay;
+    }
+    if (options) {
+      const align = (options?.align || 'l').toLowerCase();
+      const width = options?.width || 0;
+      const margin = (options?.margin || 0);
+      if (align.startsWith('r')) {
+        let cp = cpaths64.translateToNewCPaths64(Math.round(width - margin - pos.x), 0);  // ADVANCE
+        cpaths64.freePath();
+        cpaths64 = cp;
+      } else
+      if (align.startsWith('c')) {
+        cpaths64.findBoundingBox();
+        const bounding = cpaths64.getBoundingBox();
+        let cp = cpaths64.translateToNewCPaths64(Math.round((width - bounding.width) / 2), 0);
+        cpaths64.freePath();
+        cpaths64 = cp;
+
+      }
     }
     if (this.cpaths64) {
       this.cpaths64.freePath();
