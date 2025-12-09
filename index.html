@@ -2804,6 +2804,12 @@ async function loadFromLocalStorage() {
   //if (_fontBlob2) applyFontX(null, 'Test_Font_2', fontTwoInfo, hbf2, _fontBlob2);
 }
 
+document.getElementById('start').addEventListener('keydown', (evt) => {
+  if (evt.keyCode == 13) {
+    gotoOrFind();
+  }
+});
+
 //---------------------------Fill in the text as separate lines------------------
 ClearCheckList();
 updateListByIndex(1)
@@ -2944,6 +2950,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-12-09 l</p>
+</br>Tool Version: 2025-12-09 o</p>
 </body>
 </html>
