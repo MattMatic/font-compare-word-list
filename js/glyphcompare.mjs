@@ -262,6 +262,7 @@ export class CPaths64 {
 export class GlyphCompareClass {
   constructor() {
     this.glyphs = {};
+    this.hbFix = false;
   }
   destroy() {
     this.freeFont();
@@ -422,23 +423,23 @@ export class GlyphCompareClass {
       buffer.setLanguage(this.language);
     }
 
-/*--
-    hb.shape(this.font, buffer, features, 0);
---*/
-/*--Workaround for pre HarfBuzz 12.2.0 with Indic shaping--*/
-    const exports = hb.hooks.exports;
-    const addFunction = hb.hooks.addFunction;
-    const removeFunction = hb.hooks.removeFunction;
-    const utf8Decoder = hb.hooks.utf8Decoder;
-    const Module = hb.hooks.Module;    
-    var traceFunc = function(bufferPtr, fontPtr, messagePtr, user_data) {
-      return 1;
+    if (!this.hbFix) {
+      hb.shape(this.font, buffer, features, 0);
+    } else {
+      //Workaround for pre HarfBuzz 12.2.0 with Indic shaping
+      const exports = hb.hooks.exports;
+      const addFunction = hb.hooks.addFunction;
+      const removeFunction = hb.hooks.removeFunction;
+      const utf8Decoder = hb.hooks.utf8Decoder;
+      const Module = hb.hooks.Module;    
+      var traceFunc = function(bufferPtr, fontPtr, messagePtr, user_data) {
+        return 1;
+      }
+      var traceFuncPtr = addFunction(traceFunc, 'iiiii');
+      exports.hb_buffer_set_message_func(buffer.ptr, traceFuncPtr, 0, 0);
+      hb.shape(this.font, buffer, features, 0);
+      removeFunction(traceFuncPtr);
     }
-    var traceFuncPtr = addFunction(traceFunc, 'iiiii');
-    exports.hb_buffer_set_message_func(buffer.ptr, traceFuncPtr, 0, 0);
-    hb.shape(this.font, buffer, features, 0);
-    removeFunction(traceFuncPtr);
-/*--*/
     this.result = buffer.json(this.font);
     let totalAdv = 0;
     this.result.forEach(function(g) { totalAdv += g.ax; });

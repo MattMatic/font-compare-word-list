@@ -755,6 +755,9 @@ function setFontSize(size) {
             <span class='tooltiptext tooltip-bottom' id='inputLanguageList'>-</span>
           </span>
           </td></tr>
+        <tr><th>Fix:</th><td>
+          <input type='checkbox' id='cbHarfBuzzFix' title='Uncheck=browser style rendering; Checked=trace-fix (e.g. Noto Bengali)' onchange='cbHarfBuzzFixChange();'>Trace-Fix for shaping</input>
+        </td></tr>
         <tr>
           <th><button onclick='CheckSimilar();' title='Check all words where HarfBuzz output is the same (Compare GIDs is considered)'>Compare and Check</button></th>
           <td>
@@ -949,6 +952,7 @@ class hbFont {
     this.features = '';
     this.results = {};
     this.results.json = null;
+    this.hbFix = false;
   }
   destroy() {
     this.freeFontBlob();    
@@ -1015,23 +1019,22 @@ class hbFont {
       buffer.setScript(this.script || 'latn');
     if ((typeof this.lang === 'string') && (this.lang.length > 0))
       buffer.setLanguage(this.lang);
-/*
-    hb.shape(this.font, buffer, this.features);
-*/
-/*--*/
-    const exports = hb.hooks.exports;
-    const addFunction = hb.hooks.addFunction;
-    const removeFunction = hb.hooks.removeFunction;
-    const utf8Decoder = hb.hooks.utf8Decoder;
-    const Module = hb.hooks.Module;    
-    var traceFunc = function(bufferPtr, fontPtr, messagePtr, user_data) {
-      return 1;
+    if (!this.hbFix) {
+      hb.shape(this.font, buffer, this.features);
+    } else {
+      const exports = hb.hooks.exports;
+      const addFunction = hb.hooks.addFunction;
+      const removeFunction = hb.hooks.removeFunction;
+      const utf8Decoder = hb.hooks.utf8Decoder;
+      const Module = hb.hooks.Module;    
+      var traceFunc = function(bufferPtr, fontPtr, messagePtr, user_data) {
+        return 1;
+      }
+      var traceFuncPtr = addFunction(traceFunc, 'iiiii');
+      exports.hb_buffer_set_message_func(buffer.ptr, traceFuncPtr, 0, 0);
+      hb.shape(this.font, buffer, this.features);
+      removeFunction(traceFuncPtr);
     }
-    var traceFuncPtr = addFunction(traceFunc, 'iiiii');
-    exports.hb_buffer_set_message_func(buffer.ptr, traceFuncPtr, 0, 0);
-    hb.shape(this.font, buffer, this.features);
-    removeFunction(traceFuncPtr);
-/*--*/
     const json = buffer.json(this.font);
     this.results.json = json;
     let totalAdv = 0;
@@ -2758,6 +2761,15 @@ function setLastFontDetails(root, id) {
       + '<font size="-1">'+version+'</font></font>';
 }
 
+function cbHarfBuzzFixChange(event) {
+  const fix = cbHarfBuzzFix.checked;
+  hbf1.hbFix = fix;
+  hbf1.gc.hbFix = fix;
+  hbf2.hbFix = fix;
+  hbf2.gc.hbFix = fix;
+  updateListByField();
+}
+
 
 async function loadFromLocalStorage() {
   if (window?.opener?.api?.transfer) return; // NOTE: hack as I have some nasty async issue that calls this AFTER the acquireFromTransfer has been executed
@@ -2950,6 +2962,6 @@ showFontTwo(false);
 </script>
 
 <p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-12-09 o</p>
+</br>Tool Version: 2025-12-22 l</p>
 </body>
 </html>
