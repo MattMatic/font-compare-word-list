@@ -140,13 +140,13 @@ th .dropdown-content{
 }
 </style>
 
-<script type="text/javascript" src="./js/hb.js"></script> <!-- Module - REQUIRED -->
+<script type="text/javascript" src="./js/hbjs-11.0.1/hb.js"></script> <!-- Module - REQUIRED -->
 <script type="text/javascript" src="./js/hbjs.js"></script> <!-- Wrapper, can be used without -->
 <script type="text/javascript" src="./js/fontname.min.js"></script>
 <script type="text/javascript" src="./js/flatbezier.js"></script>
 <script type="text/javascript" src="./js/otinfo.min.js"></script>
 <script type='module' src="./js/glyphcompare.mjs" async></script>
-<script type='module' async>
+<script type='module' defer>
 import {CPaths64, GlyphCompareClass} from './js/glyphcompare.mjs';
 
 import * as opentype from './js/opentype.min.mjs';
@@ -169,11 +169,9 @@ function onResourcesLoaded() {
   */
 }
 
-let harfBuzzModule; // not really needed with the hbjs wrapper
 createHarfBuzz().then(hbmodule=>{
-  harfBuzzModule = hbmodule;
-  window.hb = hbjs(hbmodule);
-  window.hbversion.innerHTML = hb.version_string();
+  const hb = loadedHarfBuzzModule(hbmodule);
+  setHarfBuzzFontObjects(hb, hb);
   onResourcesLoaded();
 });
 </script>
@@ -187,6 +185,43 @@ var doShowFontTwo = false;
 var svgFont1 = true;
 var svgFont2 = true;
 
+let hbVersions = [];
+
+async function loadHarfBuzzVersion(hbf, version) {
+  if (hbVersions[version]) {
+    hbf.setHarfBuzz(hbVersions[version]);
+    updateListByField();
+  }
+  const scriptSource = `./js/hbjs-${version}/hb.js`;
+  const newScriptElement = document.createElement('script');
+  newScriptElement.onload = function() {
+    createHarfBuzz().then(hbmodule=>{
+      loadedHarfBuzzModule(hbmodule);
+      hbf.setHarfBuzz(hbVersions[version]);
+      if (hbf === hbf1) {
+        hbf2.setHarfBuzz(hbVersions[version]);
+        hbVersion2.value = version;
+      }
+      updateListByField();
+    });
+  }
+  newScriptElement.onerror = function() {
+    window.alert(`Could not load HarfBuzz ${version}`);
+  }
+  newScriptElement.src = scriptSource;
+  document.head.appendChild(newScriptElement);
+}
+
+function loadedHarfBuzzModule(module) {
+  const hb = hbjs(module);
+  window.harfBuzz = {
+    module: module,
+    hb: hb,
+  };
+  const version = hb.version_string();
+  hbVersions[version] = hb;
+  return hb;
+}
 
 //------------------------------
 // Drag and drop utilities
@@ -336,7 +371,8 @@ function BuildDifference(n, phrase) {
   let da = we.getDifferenceArea();
   if (typeof da === 'undefined') da = we.calcDifferenceArea(hbf1, hbf2);
   if (da === 0) return '';
-  let txt = `Diff:${da}</br><font size=-1>Adv:${we?.totalAdv[1]-we?.totalAdv[2]}=${Math.round(we?.totalAdv[0]*1000)/10}%</font>`;
+  //let txt = `Diff:${da}</br><font size=-1>Adv:${we?.totalAdv[1]-we?.totalAdv[2]}=${Math.round(we?.totalAdv[0]*1000)/10}%</font>`;
+  let txt = `Diff:${da}</br><font size=-1>Adv:${we?.totalAdv[1]-we?.totalAdv[2]}=${Math.round(differenceRatio(we?.totalAdv[1], we?.totalAdv[2])*1000)/10}%</font>`;
   return txt;
 }
 
@@ -434,9 +470,8 @@ function updateTolerance() {
   updateListByField();
 }
 
-function addEntry(lineNo, theWordEntry) {
+function addEntry(table, lineNo, theWordEntry) {
   //if (txt == '') return;
-  var table = document.getElementById('word_list');
   var row = table.insertRow();
   var idx=1;
 
@@ -478,10 +513,64 @@ function addEntry(lineNo, theWordEntry) {
   cell.innerHTML = html;
 }
 
+function UpdateListener(id, event, foo) {
+  const e = document.getElementById(id);
+  if (e)  {
+    e.addEventListener(event, function(e) {
+      foo(e);
+    });
+  }
+}
+
+async function hbVersionChange(event) {
+  const hbVersion1 = document.getElementById('hbVersion1');
+  const hbVersion2 = document.getElementById('hbVersion2');
+  if (event.srcElement == hbVersion1) {
+    await loadHarfBuzzVersion(hbf1, hbVersion1.value);
+    //hbVersion2.value = hbVersion1.value; // done in the async
+  } else {
+    await loadHarfBuzzVersion(hbf2, hbVersion2.value);
+  }
+  //updateListByField();
+}
+
+function createHarfBuzzChoice(id, name, value) {
+  const hbVersionsAvailable = [
+    '12.3.0',
+    '12.2.0',
+    '12.0.0',
+    '11.5.0',
+    '11.4.5',
+    '11.3.3',
+    '11.0.1',
+  ];
+  let html = `<select name="${name}" id="${id}">\r\n`;
+  hbVersionsAvailable.forEach(v=>{
+    html += `<option value="${v}"${value===v?" selected":""}>${v}</option>\r\n`;
+  });
+  html += '</select>';
+  return html;
+}
+
+function addWordListFooter(table) {
+  const row = table.insertRow();
+  row.insertCell(0);
+  row.insertCell(1);
+  let cell = row.insertCell(2);
+    cell.innerHTML = createHarfBuzzChoice('hbVersion1', 'hbVersion1', hbf1.hbVersion);
+    cell.align = 'center';
+  cell = row.insertCell(3);
+    cell.innerHTML = createHarfBuzzChoice('hbVersion2', 'hbVersion1', hbf2.hbVersion);
+    cell.align = 'center';
+  row.insertCell(4).innerHTML = 'HarfBuzz version';
+  UpdateListener('hbVersion1', 'change', hbVersionChange);
+  UpdateListener('hbVersion2', 'change', hbVersionChange);
+}
+
 function updateListByIndex(idx) {
   updateHarfBuzzScriptLanguage();
 
-  var table = document.getElementById('word_list')
+  const table = document.getElementById('word_list')
   var s = table.rows.length;
   while (s > 1) {
     s--;
@@ -490,8 +579,9 @@ function updateListByIndex(idx) {
   var n =  per_block;
   for (var i=(idx-1); i < (idx-1+n); i++) {
     if (wordList[i] === undefined) break;
-    addEntry(i, wordList[i]);
+    addEntry(table, i, wordList[i]);
   }
+  addWordListFooter(table);
   const e = document.getElementById('start');
   if (idx != e.value) {
     enableSaveButton();
@@ -864,7 +954,7 @@ function setFontSize(size) {
           <button class='dropbtn' style='width:50%' onclick='showFontTwo(true);'>Show</button>
         </div>
       </div>
-</th>
+    </th>
     <th width='26%' id='fontOverlap'>
       HarfBuzz Render<br/>
       <input type='radio' name='hbShow' value='one' onclick='updateHbShow(true, false);'>Font 1</input>
@@ -946,13 +1036,24 @@ function fillOtInfoTables(fontInfo) {
 }
 
 class hbFont {
-  constructor() {
+  constructor(hb) {
     this.script = 'latn';
     this.lang   = '';
     this.features = '';
     this.results = {};
     this.results.json = null;
     this.hbFix = false;
+    //this.setHarfBuzzModule(hbModule, hb);
+    this.hb = hb;
+  }
+  setHarfBuzz(hb) {
+    const fbOld = this.fontBlob;
+    this.freeFont();
+    this.hb = hb;
+    if (hb) {
+      this.hbVersion = hb.version_string();
+    }
+    this.setFontBlob(fbOld);
   }
   destroy() {
     this.freeFontBlob();    
@@ -986,9 +1087,9 @@ class hbFont {
     const otInfo = OTInfo.parse(fb);
     this.fontInfo = otInfo[0];
     fillOtInfoTables(this.fontInfo);
-    this.blob = hb.createBlob(this.fontBlob);
-    this.face = hb.createFace(this.blob, 0);
-    this.font = hb.createFont(this.face);
+    this.blob = this.hb.createBlob(this.fontBlob);
+    this.face = this.hb.createFace(this.blob, 0);
+    this.font = this.hb.createFont(this.face);
     const debgTable = this.face.reference_table("Debg");
     if (debgTable) {
       this.debugInfo = JSON.parse(new TextDecoder("utf8").decode(debgTable));
@@ -999,7 +1100,7 @@ class hbFont {
     this.otFont = opentype.parse(this.fontBlob);
     this.otLayout = new Layout(this.otFont, 'GPOS');
 
-    this.gc = new GlyphCompareClass();
+    this.gc = new GlyphCompareClass(this.hb);
     this.gc.setFontBlob(this.fontBlob);
     this.gc.setScriptLanguage(this.script, this.lang);
   }
@@ -1012,7 +1113,7 @@ class hbFont {
   }
   shape(txt) {
     if (!this.fontBlob) return;
-    var buffer = hb.createBuffer();
+    var buffer = this.hb.createBuffer();
     buffer.addText(txt);
     buffer.guessSegmentProperties();
     if ((typeof this.script === 'string') && (this.script.length > 0))
@@ -1020,19 +1121,19 @@ class hbFont {
     if ((typeof this.lang === 'string') && (this.lang.length > 0))
       buffer.setLanguage(this.lang);
     if (!this.hbFix) {
-      hb.shape(this.font, buffer, this.features);
+      this.hb.shape(this.font, buffer, this.features);
     } else {
-      const exports = hb.hooks.exports;
-      const addFunction = hb.hooks.addFunction;
-      const removeFunction = hb.hooks.removeFunction;
-      const utf8Decoder = hb.hooks.utf8Decoder;
-      const Module = hb.hooks.Module;    
+      const exports = this.hb.hooks.exports;
+      const addFunction = this.hb.hooks.addFunction;
+      const removeFunction = this.hb.hooks.removeFunction;
+      const utf8Decoder = this.hb.hooks.utf8Decoder;
+      const Module = this.hb.hooks.Module;    
       var traceFunc = function(bufferPtr, fontPtr, messagePtr, user_data) {
         return 1;
       }
       var traceFuncPtr = addFunction(traceFunc, 'iiiii');
       exports.hb_buffer_set_message_func(buffer.ptr, traceFuncPtr, 0, 0);
-      hb.shape(this.font, buffer, this.features);
+      this.hb.shape(this.font, buffer, this.features);
       removeFunction(traceFuncPtr);
     }
     const json = buffer.json(this.font);
@@ -1044,14 +1145,14 @@ class hbFont {
   }
   shapeWithTraceLimits(txt) {
     if (!this.fontBlob) return;
-    var buffer = hb.createBuffer();
+    var buffer = this.hb.createBuffer();
     buffer.addText(txt);
     buffer.guessSegmentProperties();
     if ((typeof this.script === 'string') && (this.script.length > 0))
       buffer.setScript(this.script || 'latn');
     if ((typeof this.lang === 'string') && (this.lang.length > 0))
       buffer.setLanguage(this.lang);
-    let trace = hb.shapeWithTraceLimits(this.font, buffer, this.features);
+    let trace = this.hb.shapeWithTraceLimits(this.font, buffer, this.features);
     const json = buffer.json(this.font);
     this.results.json = json;
     let totalAdv = 0;
@@ -1074,10 +1175,10 @@ class hbFont {
         return (a !== b);
       }
     }
-    if ( (this.results === null) ||
-         (this.results.json === null) ||
-         (hb2.results === null) ||
-         (hb2.results.json === null)
+    if ( (typeof this.results === 'undefined') ||
+         (typeof this.results.json === 'undefined') ||
+         (typeof hb2.results === 'undefined') ||
+         (typeof hb2.results.json === 'undefined')
        )
     {
       return -1;
@@ -1317,6 +1418,11 @@ class hbFont {
 var hbf1 = new hbFont;
 var hbf2 = new hbFont;
 
+function setHarfBuzzFontObjects(hb1, hb2) {
+  hbf1.setHarfBuzz(hb1);
+  hbf2.setHarfBuzz(hb2);
+}
+
 class wordEntryClass {
   constructor(line) {
     const tempArray = line.split('\t');
@@ -1478,6 +1584,7 @@ function checkBothFontsLoaded() {
   return res;
 }
 
+/*
 function showHideColumn(colNo, doShow) {
   var stl;
   if (doShow)
@@ -1491,6 +1598,7 @@ function showHideColumn(colNo, doShow) {
     cells[colNo].style.display = stl;
   }
 }
+*/
 
 function showFontTwo(doShow) {
   if (doShow) {
@@ -1888,7 +1996,7 @@ async function processChecklistGpos() {
 
   // Add the Font Details
   html += '\r\n';
-  html += `"FONT","${hbf1.fontNames.fullName}","${hbf1.fontNames.version}"`;
+  html += `"FONT","${hbf1.fontNames.fullName}","${hbf1.fontNames.version},"HarfBuzz ${hbf1.hbVersion}"`;
 
   // Add the Word List stats
   html += '\r\n';
@@ -2662,6 +2770,8 @@ function saveTextToFile(txt, filename) {
 
 function DownloadCheckList() {
   var txt = '';
+  txt += `\t#\t"FONT1","${hbf1.fontNames.fullName}","${hbf1.fontNames.version}","HarfBuzz ${hbf1.hbVersion}"\r\n`;
+  txt += `\t#\t"FONT2","${hbf2.fontNames.fullName}","${hbf2.fontNames.version}","HarfBuzz ${hbf2.hbVersion}"\r\n`;
   var i = 0;
   while (i < wordList.length) {
     if (wordList[i].getChecked()) {
@@ -2961,7 +3071,6 @@ showFontTwo(false);
 
 </script>
 
-<p></br>HarfBuzz Version: <span id="hbversion"></span>
-</br>Tool Version: 2025-12-22 l</p>
+</br>Tool Version: 2025-12-30 o</p>
 </body>
 </html>
