@@ -811,7 +811,7 @@ function setFontSize(size) {
       <table border=0 width='100%'>
         <tr><th>Notes:</th><td><input type='text' name='regExpNotes' id='regExpNotes'/></td></tr>
         <tr><th>Word:</th><td><input type='text' name='regExpWord' id='regExpWord'/></td></tr>
-        <tr><th>Glyph(s):</th><td><input type='text' name='regExpGlyph' id='regExpGlyph' title='Integer or string. Separate multiple with comma' disabled/>
+        <tr><th>Glyph(s):</th><td><input type='text' name='regExpGlyph' id='regExpGlyph' title='Integer or string. Separate multiple with comma.&#13;&#10;To look for sequences of glyph-sets separate each with ||' disabled/>
         </td></tr>
         <tr><th>GPOS:</th><td><input type='text' name='regExpGpos' id='regExpGpos' title='Integer or string. Separate multiple with comma' disabled/>
         </td></tr>
@@ -1461,6 +1461,7 @@ class wordEntryClass {
     delete this.diffArea;
     delete this.gposData;
     delete this.gidData;
+    delete this.gidSeq;
   }
   calcDifferenceArea(hbf1, hbf2) {
     hbf1.shapeGlyphCompare(this.word);
@@ -1491,11 +1492,14 @@ class wordEntryClass {
     const json = hbo.results.json;
     if (!json) return;
     let gids = new Set();
+    let gidSeq = [];
     for (let idx=0; idx<json.length; idx++) {
       const x = json[idx];
       gids.add(x.g);
+      gidSeq.push(x.g);
     }
     this.gidData = gids;
+    this.gidSeq = gidSeq;
   }
 }
 
@@ -1832,6 +1836,26 @@ function isHarfBuzzMessageImportant(msg) {
   return false;
 }
 
+function isHarfBuzzMessageAnAction(msg) {
+  const set = [
+    // GSUB operations
+    'replaced',
+    'deleted',
+    'multiplied',
+    'ligated',
+
+    // GPOS operations
+    'kerned',
+    'attached',
+    'positioned',
+  ];
+  const size = set.length;
+  for (let i=0;i<size;i++) {
+    if (msg.includes(set[i])) return true;
+  }
+  return false;
+}
+
 function findLastLookup(trace, index) {
   let res = {};
   if (index >= trace.gpos_point) res.stage = 'GPOS';
@@ -1867,18 +1891,24 @@ function extractGposData(trace) {
     if (m3) { gposTable = parseInt(m3[1], 10); }
     if (m4) { gposTable = parseInt(m4[1], 10); }
 
+    if (isHarfBuzzMessageAnAction(msg)) {
+      //~~//console.log('gpos', idx, msg, m3, m4, gposTable); //~~
+    }
     if (!m3 && !m4) {
+      //~~//console.log('!m3!m4', idx, msg, m3, m4, gposTable); //~~
       // Pull out glyph index figures to establish which GIDs affected
       // Scan for ' at ...' in the tr.m field
-      var sets = msg.match(/ glyph at [\d,]+/g);
+      var sets = msg.match(/ glyphs? at [\d,]+,?[\d]*/g);
       if (sets) {
         if (!res[gposTable])
           res[gposTable] = new Set();
         let i = 0;
         while (i < sets.length) {
+          //~~//console.log('gpos set...', gposTable, sets[i]); //~~
           const indices = sets[i].match(/\d+/g);
           let j = 0;
           while (j < indices.length) {
+            //~~//console.log('gpos set index', gposTable, j, indices[j]); //~~
             const n = parseInt(indices[j], 10);
             res[gposTable].add(tr?.t[n]?.g);
             j++;
@@ -2067,16 +2097,28 @@ async function CheckmarkRegExp() {
 
   const expNote = createRegExp(regExpNotes.value);
   const expWord = createRegExp(regExpWord.value);
-  const expListGlyph = createRegExpList(regExpGlyph.value);
+  const glyphChunk = regExpGlyph.value.split('||');  
+  const gidSet = [];
+  glyphChunk.forEach((v,i) => {
+    const expListGlyph = createRegExpList(v);
+    gidSet[i] = hbf1.findGposIndexesFromRegExpList(expListGlyph);
+  });
+
+/*
+  const expListGlyph = createRegExpList(glyphChunk[0]);
+  const expListGlyph2 = createRegExpList(glyphChunk[1]);
   const gidSet = hbf1.findGidIndexesFromRegExpList(expListGlyph);
+  const gidSet2 = hbf1.findGidIndexesFromRegExpList(expListGlyph2);
+*/
   const expListGpos  = createRegExpList(regExpGpos.value);
   const gposSet = hbf1.findGposIndexesFromRegExpList(expListGpos);
 
-  if (!expNote && !expWord && !gidSet && !gposSet) {
+  if (!expNote && !expWord && !gidSet[0] && !gposSet) {
     window.alert('Please fill in at least one field!');
     return;
   }
 
+  //~~//console.log('gposSet', gposSet); //~~
 
   startLongRunning();
   for (let i=0; i<size; i++) {
@@ -2089,7 +2131,7 @@ async function CheckmarkRegExp() {
 
     let trace = null;
 
-    if (match && (expListGlyph || gposSet)) {
+    if (match && ((gidSet.length>0) || gposSet)) {
       if (!gposSet) {
         // Straight shape to get gids
         if (!we.getGidData()) {
@@ -2105,13 +2147,20 @@ async function CheckmarkRegExp() {
         }
       }
 
-      if (match && expListGlyph) {
+      if (match && (gidSet.length>0)) {
         // Check whether the glyphs name(s) or number(s) appear in the shaped output
-        const gids = we.getGidData();
+        const gids = we.gidSeq; // Use the sequence
         let matchesGlyph = false;
-        gids.forEach( function(key) {
-          if (!matchesGlyph && gidSet.has(key)) {
+        gids.forEach( function(key, idx) {
+          if (!matchesGlyph && gidSet[0].has(key)) {
+            // Check all subsequent for a match
             matchesGlyph = true;
+            for (let gi=1;gi<gidSet.length;gi++) {
+              if (!gidSet[gi].has(gids[idx+gi])) {
+                matchesGlyph = false;
+                break;
+              }
+            }
           }
         });
         if (!matchesGlyph) match = false;
@@ -3071,6 +3120,6 @@ showFontTwo(false);
 
 </script>
 
-</br>Tool Version: 2025-12-30 o</p>
+</br>Tool Version: 2026-01-02 k</p>
 </body>
 </html>
