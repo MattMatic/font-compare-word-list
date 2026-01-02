@@ -2101,15 +2101,9 @@ async function CheckmarkRegExp() {
   const gidSet = [];
   glyphChunk.forEach((v,i) => {
     const expListGlyph = createRegExpList(v);
-    gidSet[i] = hbf1.findGposIndexesFromRegExpList(expListGlyph);
+    gidSet[i] = hbf1.findGidIndexesFromRegExpList(expListGlyph);
   });
 
-/*
-  const expListGlyph = createRegExpList(glyphChunk[0]);
-  const expListGlyph2 = createRegExpList(glyphChunk[1]);
-  const gidSet = hbf1.findGidIndexesFromRegExpList(expListGlyph);
-  const gidSet2 = hbf1.findGidIndexesFromRegExpList(expListGlyph2);
-*/
   const expListGpos  = createRegExpList(regExpGpos.value);
   const gposSet = hbf1.findGposIndexesFromRegExpList(expListGpos);
 
@@ -2117,8 +2111,6 @@ async function CheckmarkRegExp() {
     window.alert('Please fill in at least one field!');
     return;
   }
-
-  //~~//console.log('gposSet', gposSet); //~~
 
   startLongRunning();
   for (let i=0; i<size; i++) {
@@ -3120,6 +3112,6 @@ showFontTwo(false);
 
 </script>
 
-</br>Tool Version: 2026-01-02 k</p>
+</br>Tool Version: 2026-01-02 l</p>
 </body>
 </html>
