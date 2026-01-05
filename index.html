@@ -2101,7 +2101,8 @@ async function CheckmarkRegExp() {
   const gidSet = [];
   glyphChunk.forEach((v,i) => {
     const expListGlyph = createRegExpList(v);
-    gidSet[i] = hbf1.findGidIndexesFromRegExpList(expListGlyph);
+    const set = hbf1.findGidIndexesFromRegExpList(expListGlyph);
+    if (set) gidSet[i] = set;
   });
 
   const expListGpos  = createRegExpList(regExpGpos.value);
@@ -2811,8 +2812,12 @@ function saveTextToFile(txt, filename) {
 
 function DownloadCheckList() {
   var txt = '';
-  txt += `\t#\t"FONT1","${hbf1.fontNames.fullName}","${hbf1.fontNames.version}","HarfBuzz ${hbf1.hbVersion}"\r\n`;
-  txt += `\t#\t"FONT2","${hbf2.fontNames.fullName}","${hbf2.fontNames.version}","HarfBuzz ${hbf2.hbVersion}"\r\n`;
+  if (hbf1.fontNames) {
+    txt += `\t#\t"FONT1","${hbf1.fontNames.fullName}","${hbf1.fontNames.version}","HarfBuzz ${hbf1.hbVersion}"\r\n`;
+  }
+  if (hbf2.fontNames) {
+    txt += `\t#\t"FONT2","${hbf2.fontNames.fullName}","${hbf2.fontNames.version}","HarfBuzz ${hbf2.hbVersion}"\r\n`;
+  }
   var i = 0;
   while (i < wordList.length) {
     if (wordList[i].getChecked()) {
@@ -3112,6 +3117,6 @@ showFontTwo(false);
 
 </script>
 
-</br>Tool Version: 2026-01-02 l</p>
+</br>Tool Version: 2026-01-05 l</p>
 </body>
 </html>
