@@ -562,7 +562,7 @@ function addWordListFooter(table) {
   cell = row.insertCell(3);
     cell.innerHTML = createHarfBuzzChoice('hbVersion2', 'hbVersion1', hbf2.hbVersion);
     cell.align = 'center';
-  row.insertCell(4).innerHTML = 'HarfBuzz version';
+  row.insertCell(4).innerHTML = 'HarfBuzz version <button onclick="checkWhetherClearCache();">Clear cache</button>';
   UpdateListener('hbVersion1', 'change', hbVersionChange);
   UpdateListener('hbVersion2', 'change', hbVersionChange);
 }
@@ -811,7 +811,7 @@ function setFontSize(size) {
       <table border=0 width='100%'>
         <tr><th>Notes:</th><td><input type='text' name='regExpNotes' id='regExpNotes'/></td></tr>
         <tr><th>Word:</th><td><input type='text' name='regExpWord' id='regExpWord'/></td></tr>
-        <tr><th>Glyph(s):</th><td><input type='text' name='regExpGlyph' id='regExpGlyph' title='Integer or string. Separate multiple with comma.&#13;&#10;To look for sequences of glyph-sets separate each with ||' disabled/>
+        <tr><th>Glyph(s):</th><td><input type='text' name='regExpGlyph' id='regExpGlyph' title='Integer or string. Separate gids or expressions with a comma.&#13;&#10;To search for sequences of glyph-sets separate each set with ||' disabled/>
         </td></tr>
         <tr><th>GPOS:</th><td><input type='text' name='regExpGpos' id='regExpGpos' title='Integer or string. Separate multiple with comma' disabled/>
         </td></tr>
@@ -1512,6 +1512,11 @@ function fontsHaveChanged() {
   }
 }
 
+function checkWhetherClearCache() {
+  if (!window.confirm('Clear the word list HarfBuzz cache?')) return;
+  fontsHaveChanged();
+}
+
 function buildListFromFileContents(txt)
 {
   var lines = txt.split(/\r?\n+/g);
@@ -1883,34 +1888,56 @@ function extractGposData(trace) {
   let gposTable;
   const max = trace.length;
   const res = [];
+  const stack = [];
   while (idx < max) {
     const tr = trace[idx];
     const msg = tr?.m;
     const m3 = msg.match(/^start lookup (\d+) feature '(\w+)'/);
+    const m3e = msg.match(/^end lookup (\d+) feature '(\w+)'/);
     const m4 = msg.match(/^recursing to lookup (\d+)/);
-    if (m3) { gposTable = parseInt(m3[1], 10); }
-    if (m4) { gposTable = parseInt(m4[1], 10); }
+    const m4e = msg.match(/^recursed to lookup (\d+)/);
+    if (m3) { 
+      gposTable = parseInt(m3[1], 10);
+      stack.push(gposTable);
+    }
+    if (m4) {
+      gposTable = parseInt(m4[1], 10);
+      stack.push(gposTable);
+    }
+    if (m3e) {
+      stack.pop();
+    }
+    if (m4e) {
+      stack.pop();
+    }
 
     if (isHarfBuzzMessageAnAction(msg)) {
       //~~//console.log('gpos', idx, msg, m3, m4, gposTable); //~~
     }
     if (!m3 && !m4) {
-      //~~//console.log('!m3!m4', idx, msg, m3, m4, gposTable); //~~
       // Pull out glyph index figures to establish which GIDs affected
       // Scan for ' at ...' in the tr.m field
       var sets = msg.match(/ glyphs? at [\d,]+,?[\d]*/g);
       if (sets) {
-        if (!res[gposTable])
-          res[gposTable] = new Set();
+        for (let ti=stack.length-1;ti>=0;ti--) {
+          const tn = stack[ti];
+          if (!res[tn]) {
+            res[tn] = new Set();
+            res[tn].depth = new Set();
+          }
+        }
         let i = 0;
         while (i < sets.length) {
-          //~~//console.log('gpos set...', gposTable, sets[i]); //~~
           const indices = sets[i].match(/\d+/g);
           let j = 0;
           while (j < indices.length) {
-            //~~//console.log('gpos set index', gposTable, j, indices[j]); //~~
             const n = parseInt(indices[j], 10);
-            res[gposTable].add(tr?.t[n]?.g);
+            const gid = tr?.t[n]?.g;
+            for (let ti=stack.length-1; ti>=0; ti--) {
+              const tn = stack[ti];
+              res[tn].add(gid);
+              res[tn].depth.add(stack.length - ti - 1);
+            }
             j++;
           }
           i++;
@@ -1927,9 +1954,12 @@ function addToGposGrid(grid, gposData, phrase) {
   if (!gposData) return;
   if (!grid.gpos) grid.gpos = []; // A list of all the GIDs in the output
   if (!grid.gids) grid.gids = [];
+  if (!grid.gposDepths) grid.gposDepths = [];
   gposData.forEach( function(item, gposIndex) {
     if (!grid.gpos[gposIndex]) grid.gpos[gposIndex] = 0;
     grid.gpos[gposIndex]++;
+    if (!grid.gposDepths[gposIndex]) grid.gposDepths[gposIndex] = new Set();
+    grid.gposDepths[gposIndex] = grid.gposDepths[gposIndex].union(item.depth);
 
     item.forEach( function(item) {
       if (!grid.gids[item]) grid.gids[item] = 0;
@@ -1941,6 +1971,16 @@ function addToGposGrid(grid, gposData, phrase) {
     });
   });
   return grid;
+}
+
+function setToArraySortedNumerically(s) {
+  const res = Array.from(s);
+  res.sort( (a,b) => {
+    const ai = parseInt(a, 10);
+    const bi = parseInt(b, 10);
+    return ai - bi;
+  });
+  return res;
 }
 
 async function processChecklistGpos() {
@@ -1986,6 +2026,7 @@ async function processChecklistGpos() {
 
   const gposSet = gposGrid.gpos;
   const gidSet  = gposGrid.gids;
+  const gposDepths = gposGrid.gposDepths;
   if (!gposSet) return;
   html += '"GID","GlyphName"';
   gposSet.forEach( function(item, gpos) {
@@ -1996,6 +2037,19 @@ async function processChecklistGpos() {
       html += `,${gpos}`;
   });
   html += `,"TOTAL"`;
+  html += '\r\n';
+
+  html += `"","(Depth)"`;  
+  gposSet.forEach( function(item, gpos) {
+    const gposDepth = setToArraySortedNumerically(gposDepths[gpos]);
+    let txt = '';
+    gposDepth.forEach( (i) => {
+      txt += `${i},`;
+    });
+    txt = txt.slice(0, -1);
+    html += `,"${txt}"`;
+  });
+  html += `,`;
   html += '\r\n';
 
   gposGrid.forEach( function(gidItem, gid) {
@@ -2040,7 +2094,7 @@ async function processChecklistGpos() {
   html += '"----------------"\r\n';
   html += '"GPOS Count Order"\r\n';
   html += '"----------------"\r\n';
-  html += '"GPOS","TableName","Count"\r\n';
+  html += '"GPOS","TableName","Depths","Count"\r\n';
   gposSet.forEach((v,k)=> arr.push({key:k, val:v}));
   arr.sort((a,b) => {
     if (a.val > b.val) return -1;
@@ -2054,7 +2108,13 @@ async function processChecklistGpos() {
     const gposName = hbf1.getGposTableName(v.key);
     if (gposName)
       html += `"${gposName}"`;
-    html += `,${v.val}\r\n`;
+    const gposDepth = setToArraySortedNumerically(gposDepths[v.key]);
+    let txt = '';
+    gposDepth.forEach( (i) => {
+      txt += `${i},`;
+    });
+    txt = txt.slice(0, -1);
+    html += `,"${txt}",${v.val}\r\n`;
   });
   html += '\r\n';
 
@@ -3117,6 +3177,6 @@ showFontTwo(false);
 
 </script>
 
-</br>Tool Version: 2026-01-05 l</p>
+</br>Tool Version: 2026-01-06 i</p>
 </body>
 </html>
