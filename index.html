@@ -6,9 +6,12 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Gulzar|Noto+Nastaliq+Urdu">
 -->
 <style>
+:root {
+  --base-color: #aacccc;
+}
   body {
     font-family: "Calibri";
-    background-color: #aacccc;
+    background-color: var(--base-color);
   }
 .test_1 {
   font-family: "Test_Font_1";
@@ -36,7 +39,13 @@
   line-height: 0px;
 }
 .note {
-  width: 60%;
+  width: 80%;
+}
+.info {
+  width: 80%;
+  font-size: -2;
+  background-color: hsl(from var(--base-color) h s calc(l + 5));
+  font-family: "Calibri";
 }
 
 input[type="text"] {
@@ -358,10 +367,23 @@ function NoteUpdate(e) {
   checkListHasChanged();
 }
 
+function InfoUpdate(e) {
+  var n = e.name;
+  n = parseInt(n.substring(4)) - 1;
+  wordList[n].setInfo(e.value);
+  checkListHasChanged();
+}
+
+function escapeQuotes(txt, quote) {
+  const qs = quote || '\'';
+  return txt.replace(quote, '"');
+}
+
 function BuildNoteHtml(n) {
-  var txt = '<input type="text" class="note" onchange="NoteUpdate(this);" onkeyup="NoteUpdate(this);" name="note'+(n+1)+'" value="';
-  txt = txt + wordList[n].getNote();
-  txt = txt + '">';
+  var txt = '';
+  txt += `<input type="text" class="note" onchange="NoteUpdate(this);" onkeyup="NoteUpdate(this); name="note${n+1}" value="${wordList[n].getNote()}">`;
+//  txt += `<br/><font size=-1>info:<input type="text" class="info" onchange="InfoUpdate(this);" onkeyup="InfoUpdate(this); name="info${n+1}" value='${escapeQuotes(wordList[n].getInfo())}''></font>`;
+  txt += `<br><font size=-1>Info:<textarea class='info' onchange='InfoUpdate(this);' onkeyup='InfoUpdate(this);' rows=3 name='info${n+1}'>${wordList[n].getInfo()}</textarea>`;
   return txt;
 }
 
@@ -810,6 +832,7 @@ function setFontSize(size) {
     <div class='dropdown-content'>
       <table border=0 width='100%'>
         <tr><th>Notes:</th><td><input type='text' name='regExpNotes' id='regExpNotes'/></td></tr>
+        <tr><th>Info:</th><td><input type='text' name='regExpInfo' id='regExpInfo'/></td></tr>
         <tr><th>Word:</th><td><input type='text' name='regExpWord' id='regExpWord'/></td></tr>
         <tr><th>Glyph(s):</th><td><input type='text' name='regExpGlyph' id='regExpGlyph' title='Integer or string. Separate gids or expressions with a comma.&#13;&#10;To search for sequences of glyph-sets separate each set with ||' disabled/>
         </td></tr>
@@ -1428,7 +1451,9 @@ class wordEntryClass {
     const tempArray = line.split('\t');
     this.word = tempArray[0];
     this.note = tempArray[1] || '';
-    this.diff = tempArray[2] || '';
+    //this.diff = tempArray[2] || '';
+    this.diff = '';
+    this.info = tempArray.slice(2).join('\t');
     this.checked = false;
     //??//this.checked = (tempArray[2] === 'x') || (tempArray[2] === 'X'); //??
   }
@@ -1437,6 +1462,7 @@ class wordEntryClass {
   setChecked(isChecked) { this.checked = isChecked; }
   setNote(txt)  { this.note = txt; }
   getNote()     { return this.note; }
+  getInfo()     { return this.info; }
   getDiff()     { return this.diff; }
   setDiff(diff) { this.diff = diffValueToUnicode(diff); }
   setGposData(gpd) { this.gposData = gpd; }
@@ -1445,7 +1471,10 @@ class wordEntryClass {
   getGidData() { return this.gidData; }
   // The line for the check list file output
   getLine() {
-    var txt = this.word + '\t' + (this.note || '') + '\t' + (this.diff || '');
+    var txt = this.word + 
+        '\t' + (this.note || '') + 
+        //'\t' + (this.diff || '') +
+        '\t' + (this.info || '');
     while (txt.endsWith('\t')) {
       txt = txt.slice(0, txt.length-1);
     }
@@ -2156,6 +2185,7 @@ async function CheckmarkRegExp() {
   let et = new ElapsedTimer();
 
   const expNote = createRegExp(regExpNotes.value);
+  const expInfo = createRegExp(regExpInfo.value);
   const expWord = createRegExp(regExpWord.value);
   const glyphChunk = regExpGlyph.value.split('||');  
   const gidSet = [];
@@ -2168,7 +2198,7 @@ async function CheckmarkRegExp() {
   const expListGpos  = createRegExpList(regExpGpos.value);
   const gposSet = hbf1.findGposIndexesFromRegExpList(expListGpos);
 
-  if (!expNote && !expWord && !gidSet[0] && !gposSet) {
+  if (!expNote && !expInfo && !expWord && !gidSet[0] && !gposSet) {
     window.alert('Please fill in at least one field!');
     return;
   }
@@ -2181,6 +2211,7 @@ async function CheckmarkRegExp() {
 
     if (match && expNote) match = expNote.test(we.getNote());
     if (match && expWord) match = expWord.test(phrase);
+    if (match && expInfo) match = expInfo.test(we.getInfo());
 
     let trace = null;
 
@@ -2836,6 +2867,7 @@ function acquireFontAndLists(w) {
     var wordEntry = new wordEntryClass(xwe.word);
     wordEntry.checked = xwe.checked;
     wordEntry.note = xwe.note;
+    wordEntry.info = xwe.info;
     wordList.push(wordEntry);    
   }
   applyFontX(null, 'Test_Font_1', fontOneInfo, hbf1, xfer.fontBlob);
@@ -3177,6 +3209,6 @@ showFontTwo(false);
 
 </script>
 
-</br>Tool Version: 2026-01-06 i</p>
+</br>Tool Version: 2026-01-08 p</p>
 </body>
 </html>
