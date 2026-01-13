@@ -51,6 +51,10 @@
 input[type="text"] {
   font-size: 100%;
 }
+.menu-content .searchInput {
+  /*font-size:50%;*/
+  width: 100%;
+}
 table, th, td {
   border: 2px solid #448888;
   border-collapse: collapse;
@@ -66,6 +70,39 @@ td {
 .wordlist, input[type="file"] {
   background-color: #8ebf42;
 }
+
+.menubtn {
+  border-radius: 2px;
+  background-color: #eff; /*rgba(96,192,128,0.5);*/
+  color: #244;
+  padding: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 100%;
+  anchor-name: var(--ddmenu);
+}
+.menu-content {
+  position: absolute;
+  position-anchor: var(--ddmenu);
+  inset: auto;
+  top: anchor(bottom);
+  left: anchor(left);
+  margin-top: 4px;
+  background-color: #eff;
+  min-width: 200px;
+  border-radius: 0px 0px 4px 4px;
+  border: 3px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+}
+.menu-content a{
+  color: black;
+  padding: 8px 12px;
+  text-decoration: none;
+  display: block;  
+}
+.menu-content a:hover {background-color: #cee;}
+
 .dropbtn {
   border-radius: 4px;
   background-color: rgba(96,192,128,0.5);
@@ -284,6 +321,12 @@ window.addEventListener('beforeunload', function(e) {
   return confirmMessage;
 });
 
+
+function elementHidePopover(e) {
+  if (e && e.parentElement && e.parentElement.hidePopover) {
+    e.parentElement.hidePopover();
+  }
+}
 
 //------------------------------
 // Document/CSS Font Utilities
@@ -797,46 +840,46 @@ function setFontSize(size) {
 
 <!-- Menus Start -->
   <div class='dropdown'>
-    <button class='dropbtn'>🔤Word List</button>
-    <div class='dropdown-content' id='ddWordList'>
-    <a href='#' onclick='DownloadCheckList();' title='Save check list to file'>⏬Download</a></br>
+    <button class='menubtn' popovertarget='ddWordList'>🔤Word List</button>
+    <div class='menu-content' id='ddWordList' popover>
+    <a href='#' onclick='DownloadCheckList(this);' title='Save check list to file'>⏬Download</a></br>
     <!--<a href='#' onclick='pasteUniqueWords();' title='Paste Unique words - new words are checked'>⭐Paste Unique</a></br>-->
     </div>
   </div>
   <div class='dropdown'>
-    <button class='dropbtn'>📊Sort</button>
-    <div class='dropdown-content' id='ddWordList'>
-    <a href='#' onclick='SortWordList(false);' title='Sort by Word'>🔤Word</a></br>
-    <a href='#' onclick='SortWordList(false, true);'  title='Sort by Check then Word'>✅Check + Word</a></br>
-    <a href='#' onclick='SortWordList(true);'  title='Sort by Note then Word'>📓Note + Word</a></br>
-    <a href='#' onclick='SortWordListArea();'  title='Sort by Difference Area'>📐Area + Word</a></br>
+    <button class='menubtn' popovertarget='ddSortList'>📊Sort</button>
+    <div class='menu-content' id='ddSortList' popover>
+    <a href='#' onclick='SortWordList(this, false);' title='Sort by Word'>🔤Word</a></br>
+    <a href='#' onclick='SortWordList(this, false, true);'  title='Sort by Check then Word'>✅Check + Word</a></br>
+    <a href='#' onclick='SortWordList(this, true);'  title='Sort by Note then Word'>📓Note + Word</a></br>
+    <a href='#' onclick='SortWordListArea(this);'  title='Sort by Difference Area'>📐Area + Word</a></br>
     </div>
   </div>
   <div class='dropdown'>
-    <button class='dropbtn'>✅Check List</button>
-    <div class='dropdown-content'>
-    <a href='#' onclick='ClearCheckListUser();' title='Remove check from all words'>⬜Clear All</a></br>
-    <a href='#' onclick='CheckAllList();' title='Check all words'>✅Set All</a></br>
-    <a href='#' onclick='InvertCheckList();' title='Toggle check for all words'>🔵Invert</a></br>
-    <a href='#' onclick='CheckNotes();' title='Check all words that have some text in the note field'>📓Check Notes</a></br>
+    <button class='menubtn' popovertarget='ddCheckList'>✅Check List</button>
+    <div class='menu-content' id='ddCheckList' popover>
+    <a href='#' onclick='ClearCheckListUser(this);' title='Remove check from all words'>⬜Clear All</a></br>
+    <a href='#' onclick='CheckAllList(this);' title='Check all words'>✅Set All</a></br>
+    <a href='#' onclick='InvertCheckList(this);' title='Toggle check for all words'>🔵Invert</a></br>
+    <a href='#' onclick='CheckNotes(this);' title='Check all words that have some text in the note field'>📓Check Notes</a></br>
 
-    <a href='#' onclick='openFontCompareTool();' title='Send checked words to HarfBuzz Font Compare Tool'>➜ Font Compare</a></br>
-    <a href='#' onclick='openFontForceFieldTool();' title='Send checked words to Font Force Field Tool'>➜ Force Field</a></br>
+    <a href='#' onclick='openFontCompareTool(this);' title='Send checked words to HarfBuzz Font Compare Tool'>➜ Font Compare</a></br>
+    <a href='#' onclick='openFontForceFieldTool(this);' title='Send checked words to Font Force Field Tool'>➜ Force Field</a></br>
 
-    <span id='gidGposAnalytics' hidden><a href='#' onclick='processChecklistGpos();' title='Process GPOS/GID data'>📈 Glyph/GPOS analytics</a></span></br>
+    <span id='gidGposAnalytics' hidden><a href='#' onclick='processChecklistGpos(this);' title='Process GPOS/GID data'>📈 Glyph/GPOS analytics</a></span></br>
     </div>
   </div>
 
   <div class='dropdown'>
-    <button class='dropbtn'>🔍Search</button>
-    <div class='dropdown-content'>
-      <table border=0 width='100%'>
-        <tr><th>Notes:</th><td><input type='text' name='regExpNotes' id='regExpNotes'/></td></tr>
-        <tr><th>Info:</th><td><input type='text' name='regExpInfo' id='regExpInfo'/></td></tr>
-        <tr><th>Word:</th><td><input type='text' name='regExpWord' id='regExpWord'/></td></tr>
-        <tr><th>Glyph(s):</th><td><input type='text' name='regExpGlyph' id='regExpGlyph' title='Integer or string. Separate gids or expressions with a comma.&#13;&#10;To search for sequences of glyph-sets separate each set with ||' disabled/>
+    <button class='menubtn' popovertarget='ddSearch'>🔍Search</button>
+    <div class='menu-content' id='ddSearch' popover>
+      <table border=0>
+        <tr><th>Notes:</th><td><input class='searchInput' type='text' name='regExpNotes' id='regExpNotes'/></td></tr>
+        <tr><th>Info:</th><td><input class='searchInput' type='text' name='regExpInfo' id='regExpInfo'/></td></tr>
+        <tr><th>Word:</th><td><input class='searchInput' type='text' name='regExpWord' id='regExpWord'/></td></tr>
+        <tr><th>Glyph(s):</th><td><input class='searchInput' type='text' name='regExpGlyph' id='regExpGlyph' title='Integer or string. Separate gids or expressions with a comma.&#13;&#10;To search for sequences of glyph-sets separate each set with ||' disabled/>
         </td></tr>
-        <tr><th>GPOS:</th><td><input type='text' name='regExpGpos' id='regExpGpos' title='Integer or string. Separate multiple with comma' disabled/>
+        <tr><th>GPOS:</th><td><input class='searchInput' type='text' name='regExpGpos' id='regExpGpos' title='Integer or string. Separate multiple with comma' disabled/>
         </td></tr>
         <tr><th></th><td>Regular Expression Hint: ^=start, $=end, \=escape</td>
         <tr><th>Check:</th><td>
@@ -845,17 +888,17 @@ function setFontSize(size) {
           <input type='radio' name='regExpOp' value='invert'><label for='invert'>Invert</label>          
         </td></tr>
         <tr><th></th><td>
-          <button onclick='CheckmarkRegExp();' title='Run regular expression and adjust check'>Search</button>
+          <button onclick='ddSearch.hidePopover(); CheckmarkRegExp();' title='Run regular expression and adjust check'>Search</button>
         </td></tr>
       </table>
     </div>
   </div>
 
   <div class='dropdown'>
-    <button class='dropbtn'>&#x1F30D;HarfBuzz</button>
-    <div class='dropdown-content'>
-      <table border=0 width='100%'>
-        <tr><th>HTML Lang:</th><td><input type='text' id='HTMLLang' oninput='updateLanguage();' title='Web page language ID'/></td></tr>
+    <button class='menubtn' popovertarget='ddHarfBuzz'>&#x1F30D;HarfBuzz</button>
+    <div class='menu-content' id='ddHarfBuzz' popover>
+      <table border=0>
+        <tr><th width='20%'>HTML Lang:</th><td><input type='text' id='HTMLLang' oninput='updateLanguage();' title='Web page language ID'/></td></tr>
         <tr><th>Script:</th><td>
           <span class='tooltip'>
             <input type='text' id='inputScript' oninput='updateLanguage();'/>
@@ -910,11 +953,11 @@ function setFontSize(size) {
           </td>
         </tr>
         <tr>
-          <th><button onclick='UpdateDifferences();' title='Regression test:&#13;&#10;For each word where HarfBuzz differs between Font#1 and Font#2 -> toggle the check.&#13;&#10;&#13;&#10;Words left checked will be:&#13;&#10;• requested changes that did not occur&#13;&#10;• unexpected changes'>Update Differences</button></th>
+          <th><button onclick='ddHarfBuzz.hidePopover(); UpdateDifferences();' title='Regression test:&#13;&#10;For each word where HarfBuzz differs between Font#1 and Font#2 -> toggle the check.&#13;&#10;&#13;&#10;Words left checked will be:&#13;&#10;• requested changes that did not occur&#13;&#10;• unexpected changes'>Update Differences</button></th>
           <td><input type='checkbox' id='HBGIDs' oninput='updateLanguage();' title='Unchecked = ignore glyph ID when comparing; Checked = compare glyph ID in HarfBuzz output'>Compare GIDs</input></td>
         </tr>
         <tr>
-          <th><button onclick='CheckDifferentGlyphs();' title='Render the outlines and check any that have large difference area'>Compare Outlines</button></th>
+          <th><button onclick='ddHarfBuzz.hidePopover(); CheckDifferentGlyphs();' title='Render the outlines and check any that have large difference area'>Compare Outlines</button></th>
           <td>
             <font color='red'>EXPERIMENTAL</font></br>
             <input type='text' id='HBCGtolerance' title='1000s designUnits^2 area tolerance' value='20'></input></br>
@@ -931,11 +974,11 @@ function setFontSize(size) {
   </div>      
 
   <div class='dropdown'>
-    <button class='dropbtn'>❌Delete</button>
-    <div class='dropdown-content'>
-    <a href='#' onclick='DeleteDuplicates();' title='Remove all duplicate words'>📚Delete Duplicates</a></br>
-    <a href='#' onclick='RemoveUnchecked();' title='Remove all words that are NOT checked (cannot be undone!)'>❌Delete Unchecked</a></br>
-    <a href='#' onclick='DeleteAll();' title='Remove all words (cannot be undone!)'>⛔Delete All</a></br>
+    <button class='menubtn' popovertarget='ddDelete'>❌Delete</button>
+    <div class='menu-content' id='ddDelete' popover>
+    <a href='#' onclick='DeleteDuplicates(this);' title='Remove all duplicate words'>📚Delete Duplicates</a></br>
+    <a href='#' onclick='RemoveUnchecked(this);' title='Remove all words that are NOT checked (cannot be undone!)'>❌Delete Unchecked</a></br>
+    <a href='#' onclick='DeleteAll(this);' title='Remove all words (cannot be undone!)'>⛔Delete All</a></br>
     </div>
   </div>
 <!-- Menus End -->
@@ -1767,7 +1810,8 @@ function ClearCheckList() {
   resetCheckListChanged();
 }
 
-function ClearCheckListUser() {
+function ClearCheckListUser(e) {
+  elementHidePopover(e);
   if (checkListChanged) {
     if (!window.confirm('Check List has changed! Clear all?')) return;
   }
@@ -1776,7 +1820,8 @@ function ClearCheckListUser() {
   updateListByField();
 }
 
-function CheckAllList() {
+function CheckAllList(e) {
+  elementHidePopover(e);
   if (checkListChanged) {
     if (!window.confirm('Check List has changed! Set all?')) return;
   }
@@ -1790,7 +1835,8 @@ function CheckAllList() {
   updateListByField();
 }
 
-function InvertCheckList() {
+function InvertCheckList(e) {
+  elementHidePopover(e);
   const size = wordList.length;
   for (let i=0; i<size; i++) {
     wordList[i].setChecked(!wordList[i].getChecked());
@@ -2012,7 +2058,8 @@ function setToArraySortedNumerically(s) {
   return res;
 }
 
-async function processChecklistGpos() {
+async function processChecklistGpos(e) {
+  elementHidePopover(e);
   const size = wordList.length;
   let et = new ElapsedTimer();
   gposGrid = [];
@@ -2021,6 +2068,7 @@ async function processChecklistGpos() {
   let aborted = false;
 
   startLongRunning();
+  startTheLoop();
   for (let i=0; i<size; i++) {
     const we = wordList[i];
     if (we.getChecked()) {
@@ -2204,6 +2252,7 @@ async function CheckmarkRegExp() {
   }
 
   startLongRunning();
+  startTheLoop();
   for (let i=0; i<size; i++) {
     const we = wordList[i];
     const phrase = we.getWord();
@@ -2330,13 +2379,35 @@ class ElapsedTimer {
   }
 }
 
+var loopStarted;
+
+function secondsToHHMMSS(t) {
+  if (t < 3600)
+    return new Date(t * 1000).toISOString().substring(14, 19);
+  else
+    return new Date(t * 1000).toISOString().substring(11, 16);
+}
+
+function startTheLoop() {
+  loopStarted = Date.now();
+}
+
 function updateStatusMessage(i, foundCount, total) {
+  const overallTime = (Date.now() - loopStarted) / 1000.0;
+  let rateWords;
+  if (i < 0)
+    rateWords = Math.round(total / overallTime);
+  else
+    rateWords = Math.round(i / overallTime);
+  let eta = (total - i) / rateWords;
+
   if (i <= 0)
     statusUpdate.innerHTML = '-';
   else {
-    let html = '<span><font color="red">'+i + '/'+ total+'</font></span>'
+    let html = `<progress max='${total}' value='${i}'></progress><br/><span><font color='red'>${i}/${total}</font>`;
+    html += `<br/>${secondsToHHMMSS(overallTime)}/${secondsToHHMMSS(eta)} (${rateWords}/s)</span>`
     if (foundCount > 0) {
-      html += '</br>'+foundCount + ' found';
+      html += '<br/>'+foundCount + ' found';
     }
     statusUpdate.innerHTML = html;
   }
@@ -2396,6 +2467,7 @@ async function CheckSimilar() {
   updateHarfBuzzScriptLanguage();
 
   var checkCount = 0;
+  startTheLoop();
   updateStatusMessage(i, checkCount, total);
 
   let et = new ElapsedTimer();
@@ -2453,6 +2525,7 @@ async function CheckDifferentGlyphs(onCompletion) {
   const tolerance = parseFloat(HBCGtolerance.value);
 
   let checkCount = 0;
+  startTheLoop();
   updateStatusMessage(i, checkCount, total);
 
   for (let i=0; i<total; i++) {
@@ -2484,7 +2557,8 @@ async function CheckDifferentGlyphs(onCompletion) {
   doneLongRunning();
 }
 
-function CheckNotes() {
+function CheckNotes(e) {
+  elementHidePopover(e);
   var i = 0;
   var count = 0;
   while (i < wordList.length) {
@@ -2527,6 +2601,7 @@ async function UpdateDifferences() {
   updateHarfBuzzScriptLanguage();
 
   let checkCount = 0;
+  startTheLoop();
   updateStatusMessage(i, checkCount, total);
 
   let et = new ElapsedTimer();
@@ -2561,7 +2636,8 @@ async function UpdateDifferences() {
   doneLongRunning();
 }
 
-async function RemoveUnchecked() {
+async function RemoveUnchecked(e) {
+  elementHidePopover(e);
   if (isLongRunning()) return;
   if (!window.confirm('Delete all unchecked words?\r\nCannot be undone!!!')) return;
   var i = 0;
@@ -2602,7 +2678,8 @@ async function RemoveUnchecked() {
   doneLongRunning();
 }
 
-function DeleteDuplicates() {
+function DeleteDuplicates(e) {
+  elementHidePopover(e);
   if (!window.confirm('Delete duplicate words?\r\nCannot be undone!!!')) return;
   const size = wordList.length;
   var res = [];
@@ -2644,7 +2721,8 @@ function _updateAfterSort() {
   updateStatusMessage(-1);
 }
 
-function SortWordList(sortByNote, byChecked) {
+function SortWordList(e, sortByNote, byChecked) {
+  elementHidePopover(e);
   if (!window.confirm('Sort word list?\r\nCannot be undone!!!')) return;
   var compareWord = function(a,b) {
     const aw = a.getWord();
@@ -2687,7 +2765,8 @@ function SortWordList(sortByNote, byChecked) {
   _updateAfterSort();
 }
 
-function SortWordListArea() {
+function SortWordListArea(e) {
+  elementHidePopover(e);
   if (!window.confirm('Sort word list?\r\nCannot be undone!!!')) return;
   HBCGlive.checked = true;
   CheckDifferentGlyphs( () => {
@@ -2709,7 +2788,8 @@ function SortWordListArea() {
   });
 }
 
-function DeleteAll() {
+function DeleteAll(e) {
+  elementHidePopover(e);
   if (!window.confirm('Delete all words?\r\nCannot be undone!!!')) return;
   wordList = [];
   UpdateWordCount();
@@ -2822,7 +2902,8 @@ function prepareApi() {
   }
 }
 
-function openFontCompareTool() {
+function openFontCompareTool(e) {
+  elementHidePopover(e);
   prepareApi();
   if (!hbfcw || hbfcw.closed) {
     var hbfc_url;
@@ -2837,7 +2918,8 @@ function openFontCompareTool() {
   }
 }
 
-function openFontForceFieldTool() {
+function openFontForceFieldTool(e) {
+  elementHidePopover(e);
   prepareApi();
   if (!ffftw || ffftw.closed) {
     var ffft_url;
@@ -2902,7 +2984,8 @@ function saveTextToFile(txt, filename) {
   a.click();
 }
 
-function DownloadCheckList() {
+function DownloadCheckList(e) {
+  elementHidePopover(e);
   var txt = '';
   if (hbf1.fontNames) {
     txt += `\t#\t"FONT1","${hbf1.fontNames.fullName}","${hbf1.fontNames.version}","HarfBuzz ${hbf1.hbVersion}"\r\n`;
@@ -3209,6 +3292,6 @@ showFontTwo(false);
 
 </script>
 
-</br>Tool Version: 2026-01-08 p</p>
+</br>Tool Version: 2026-01-13 l</p>
 </body>
 </html>
