@@ -449,7 +449,7 @@ const hb_icons = {
   advance  : ['&#x1F7E6;', '🟦',   8],     // Blue
   offset   : ['&#x1F7EA;', '🟪',   4],     // Purple
   gid      : ['&#x2b1c;' , '⬜',   1],     // White
-  reg_exp  : new RegExp('[✅🟥🟠🟨🟦🟪⬜]', 'g')
+  reg_exp  : new RegExp('[✅🟥🟠🟨🟦🟪⬜]', 'gu')
 };
 
 function diffFieldToText(diff) {
@@ -851,8 +851,9 @@ function setFontSize(size) {
   <div class='dropdown'>
     <button class='menubtn' popovertarget='ddSortList'>📊Sort</button>
     <div class='menu-content' id='ddSortList' popover>
+    <p><input type='checkbox' id='cbCheckedFirst' checked><label for='cbCheckedFirst'>Checked + …</label></input></p>
     <a href='#' onclick='SortWordList(this, false);' title='Sort by Word'>🔤Word</a></br>
-    <a href='#' onclick='SortWordList(this, false, true);'  title='Sort by Check then Word'>✅Check + Word</a></br>
+    <!--<a href='#' onclick='SortWordList(this, false, true);'  title='Sort by Check then Word'>✅Check + Word</a></br>-->
     <a href='#' onclick='SortWordList(this, true);'  title='Sort by Note then Word'>📓Note + Word</a></br>
     <a href='#' onclick='SortWordListByInfo(this);'  title='Sort by FFFT Info'>🟥Force Field Glyph Info + Word</a></br>
     <a href='#' onclick='SortWordListArea(this);'  title='Sort by Difference Area'>📐Area + Word</a></br>
@@ -878,7 +879,10 @@ function setFontSize(size) {
     <div class='menu-content' id='ddSearch' popover>
       <table border=0>
         <tr><th>Notes:</th><td><input class='searchInput' type='text' name='regExpNotes' id='regExpNotes'/></td></tr>
-        <tr><th>Info:</th><td><input class='searchInput' type='text' name='regExpInfo' id='regExpInfo'/></td></tr>
+        <tr><th>Info:</th><td><input class='searchInput' type='text' name='regExpInfo' id='regExpInfo'/>
+          <input type='checkbox' id='cbInfoNoIcons'>Ignore Glyph Icons</input>
+          <input hidden type='text' id='txtNoIcons' value='(🟥|🟧|🟪|🟦|🟢|🟡|↳)'></input>
+        </td></tr>
         <tr><th>Word:</th><td><input class='searchInput' type='text' name='regExpWord' id='regExpWord'/></td></tr>
         <tr><th>Glyph(s):</th><td><input class='searchInput' type='text' name='regExpGlyph' id='regExpGlyph' title='Integer or string. Separate gids or expressions with a comma.&#13;&#10;To search for sequences of glyph-sets separate each set with ||' disabled/>
         </td></tr>
@@ -1509,6 +1513,7 @@ class wordEntryClass {
   setNote(txt)  { this.note = txt; }
   getNote()     { return this.note; }
   getInfo()     { return this.info; }
+  setInfo(txt)  { this.info = txt; }
   getDiff()     { return this.diff; }
   setDiff(diff) { this.diff = diffValueToUnicode(diff); }
   setGposData(gpd) { this.gposData = gpd; }
@@ -2223,6 +2228,8 @@ async function processChecklistGpos(e) {
   saveTextToFile(html, 'Glyph-GPOS-Analytics.'+DateTimeForFilename()+'.txt');
 }
 
+//const ffftIconsString = '[🟥🟧🟪🟦🟢🟡]';
+//const ffftIconsRE = new RegExp(ffftIconsString, 'ug');
 
 async function CheckmarkRegExp() {
   // Glyph Name or GPOS table name
@@ -2236,7 +2243,10 @@ async function CheckmarkRegExp() {
   let et = new ElapsedTimer();
 
   const expNote = createRegExp(regExpNotes.value);
-  const expInfo = createRegExp(regExpInfo.value);
+  const reNoIcons = new RegExp(txtNoIcons.value, 'ug');
+  const infoRE = (cbInfoNoIcons.checked) ? reNoIcons : undefined;
+  const infoSearchTerm = infoRE ? regExpInfo.value.replace(infoRE, '') : regExpInfo.value;
+  const expInfo = createRegExp(infoSearchTerm);
   const expWord = createRegExp(regExpWord.value);
   const glyphChunk = regExpGlyph.value.split('||');  
   const gidSet = [];
@@ -2263,7 +2273,11 @@ async function CheckmarkRegExp() {
 
     if (match && expNote) match = expNote.test(we.getNote());
     if (match && expWord) match = expWord.test(phrase);
-    if (match && expInfo) match = expInfo.test(we.getInfo());
+    if (match && expInfo) {
+      let info = we.getInfo();
+      if (infoRE) info = info.replace(infoRE, '');
+      match = expInfo.test(info);
+    }
 
     let trace = null;
 
@@ -2724,7 +2738,29 @@ function _updateAfterSort() {
   updateStatusMessage(-1);
 }
 
-function SortWordList(e, sortByNote, byChecked) {
+
+function compareChecked(a,b) {
+  if (a.getChecked()) {
+    if (b.getChecked())
+      return 0;
+    return -1;
+  }
+  if (b.getChecked())
+    return 1;
+  return 0;
+}
+
+// Create the 'checked' first option
+function createCompareFunction(foo) {
+  if (!cbCheckedFirst.checked) return foo;
+  return function(a,b) {
+    const r = compareChecked(a,b);
+    if (r != 0) return r;
+    return foo(a,b);
+  }
+}
+
+function SortWordList(e, sortByNote/*, byChecked*/) {
   elementHidePopover(e);
   if (!window.confirm('Sort word list?\r\nCannot be undone!!!')) return;
   var compareWord = function(a,b) {
@@ -2758,13 +2794,10 @@ function SortWordList(e, sortByNote, byChecked) {
     }
     return compareWord(a,b);
   }
-  if (byChecked)
-    wordList.sort(compareCheck);
-  else
   if (sortByNote)
-    wordList.sort(compareNote);
+    wordList.sort(createCompareFunction(compareNote));
   else
-    wordList.sort(compareWord);
+    wordList.sort(createCompareFunction(compareWord));
   _updateAfterSort();
 }
 
@@ -2783,12 +2816,16 @@ function hasAnyOf(chr, srch) {
 
 // Find index in txt that contains any character of srch
 function findContainsAny(txt, srch) {
-  for (let ii=0; ii<srch.length; ii++) {
-    const i = txt.indexOf(srch[ii]);
-    if (i >= 0) {
-      return {
-        index:i,
-        search: ii,
+  //if (txt && txt.length)
+  {
+    for (let ii=0; ii<srch.length; ii++) {
+      const i = txt.indexOf(srch[ii]);
+      if (i >= 0) {
+        return {
+          index:i,
+          search: ii,
+          found: true,
+        }
       }
     }
   }
@@ -2854,7 +2891,7 @@ function SortWordListByInfo(e) {
     if (ai < bi) return -1;
     return compareWord(a,b);
   }
-  wordList.sort(compareInfo);
+  wordList.sort(createCompareFunction(compareInfo));
   _updateAfterSort();
 }
 
@@ -3385,6 +3422,6 @@ showFontTwo(false);
 
 </script>
 
-</br>Tool Version: 2026-01-13 p</p>
+</br>Tool Version: 2026-01-15 m</p>
 </body>
 </html>
