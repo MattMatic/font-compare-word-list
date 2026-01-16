@@ -47,6 +47,9 @@
   background-color: hsl(from var(--base-color) h s calc(l + 5));
   font-family: "Calibri";
 }
+.HiLite {
+  background-color: yellow;
+}
 
 input[type="text"] {
   font-size: 100%;
@@ -1676,9 +1679,12 @@ function splitInfoToGlyphs(txt) {
     value: 99, // Yuck
   };
   if (glyphs && glyphs[1]) {
-    const arr = glyphs[1].split(' ');
+    const glyphsTxt = glyphs[1].trim();
+    const arr = glyphsTxt.split(' ');
     arr.forEach(function(g, idx) {
+      if (!g) return;
       const m = g.match(/↳?([🟥🟧🟪🟦🟢🟡]*)([^\s]+)/u); // ignore marker point
+      if (!m) return;
       const icons = m[1];
       if (icons) {
         for (let i=0;i<icons.length;i+=2) {
@@ -1767,11 +1773,31 @@ async function patternMatchToClipboard() {
   // Copy to clipboard as a test...
   let txt = `# SEARCH PATTERN: ${searchText}<br/>\r\n<br/>\r\n`;
   //txt += 'Index\tWord\tMatchLength\tInfo\tResult\r\n';
-  txt += 'Word \tInfo \tGlyphCount \tGlyphsMatched<br/>\r\n';
+  //txt += 'Word \tInfo \tGlyphCount \tGlyphsMatched<br/>\r\n';
+  txt += 'Word \tInfo \tGlyphCount<br/>\r\n';
   result.forEach((entry, index) => {
     const matched = entry.res.join(' ');
     //txt += `${index+1}\t${entry.word}\t${entry.res.length}\t${entry.wordEntry.getInfo()}\t${matched}\r\n`
-    txt += `${entry.word} \t${entry.wordEntry.getInfo()} \t${entry.res.length} \t${matched}<br/>\r\n`
+    let glyphs = '';
+    let im=0;
+    const ic = entry.wordEntry.infoCache();
+    ic.forEach((e)=> {
+      let highlight = false;
+      if (im<entry.res.length) {
+        if (entry.res[im] === e.glyph) {
+          highlight = true;
+          im++;
+        }
+        glyphs += e.icons;
+        if (highlight)
+          glyphs += `<span class='HiLite'>${e.glyph}</span> `;
+        else
+          glyphs += `${e.glyph} `;
+      }
+    });
+
+    //txt += `${entry.word} \t${entry.wordEntry.getInfo()} \t${entry.res.length} \t${matched}<br/>\r\n`
+    txt += `${entry.word} \t${glyphs} \t${entry.res.length}<br/>\r\n`
   });
   //taPatternOutput.value = txt;
   divPatternOutput.innerHTML = txt;
@@ -1779,8 +1805,9 @@ async function patternMatchToClipboard() {
 }
 
 async function copyPatternResultsToClipboard() {
-  let txt = divPatternOutput.innerHTML;
-  txt = txt.replace(/<br\/?>/g, '');
+  //let txt = divPatternOutput.innerHTML;
+  //txt = txt.replace(/<br\/?>/g, '');
+  const txt = divPatternOutput.textContent;
   navigator.clipboard.writeText(txt);
 }
 
@@ -3772,6 +3799,6 @@ showFontTwo(false);
 
 </script>
 
-</br>Tool Version: 2026-01-15 m</p>
+</br>Tool Version: 2026-01-16 p</p>
 </body>
 </html>
