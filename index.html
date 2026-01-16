@@ -184,6 +184,38 @@ th .dropdown-content{
   border-style: solid;
   border-color: transparent transparent #555 transparent;
 }
+dialog::backdrop {
+  backdrop-filter: blur(2px)
+  /*background-color: hsl(160, 40%, 50%, 0.2);*/
+}
+dialog {
+  background-color: #e8ece8;
+}
+[aria-label="close"] {
+  appearance: none;
+  background-color: #fcc;
+  float: right;
+  border: 1px solid;
+  border-radius: 50%;
+}
+.prContainter {
+  /*
+  white-space: nowrap;
+  width:600px;
+  height:400px;
+  */
+  overflow-x: scroll;
+  overflow-y: auto;
+}
+.prContent {
+  width:800px;
+  height:600px;
+  display: block;
+  white-space: nowrap;
+  overflow-y: scroll;
+  overflow-x: scroll;
+  font-family: monospace;
+}
 </style>
 
 <script type="text/javascript" src="./js/hbjs-11.0.1/hb.js"></script> <!-- Module - REQUIRED -->
@@ -650,9 +682,6 @@ function updateListByIndex(idx) {
   }
   addWordListFooter(table);
   const e = document.getElementById('start');
-  if (idx != e.value) {
-    enableSaveButton();
-  }
   e.value = String(idx);
 }
 
@@ -902,6 +931,10 @@ function setFontSize(size) {
   </div>
 
   <div class='dropdown'>
+    <button class='menubtn' onclick='dlgPatternSearch.showModal();' id='btnPatternSearch'>🎶Patterns</button>
+  </div>
+
+  <div class='dropdown'>
     <button class='menubtn' popovertarget='ddHarfBuzz'>&#x1F30D;HarfBuzz</button>
     <div class='menu-content' id='ddHarfBuzz' popover>
       <table border=0>
@@ -1036,6 +1069,32 @@ function setFontSize(size) {
     </th>
   </tr>
 </table>
+
+<dialog id='dlgPatternSearch'>
+  <button type='submit' aria-label='close' onclick='dlgPatternSearch.close();'>X</button>
+  <h2>Pattern Search</h2>
+  <table border=0>
+    <tr><td>Info Search:</td><td><input class='searchInput' type='text' name='txtPatternMatchText' id='txtPatternMatchText'/></td></tr>
+    <tr><td>Min Count:</td><td><input type='text' id='txtMinMatch' value='2'></input></td></tr>
+    <!--
+    <br/>Dist 1<input type='text' id='txtDist1' value='1'></input>
+    <br/>Dist 2<input type='text' id='txtDist2' value='2'></input>
+    -->
+    <tr><td> </td><td>
+      <button onclick='patternMatchToClipboard();' id='btnPatternMatch'>Find Matches</button> 
+      <button onclick='copyPatternResultsToClipboard();' id='btnPatternMatchCopy'>Copy to Clipboard</button>
+      </td>
+    </tr>
+    <tr><td>Output:</td><td>
+      <div id='divPatternResults'> &nbsp; </div>
+      <div class='prContainer'>
+        <div class='prContent' id='divPatternOutput'> </div>
+        <!--<textarea rows=20 cols=60 id='taPatternOutput' wrap='off' style='font-family:monospace;' spellcheck='false'></textarea>-->
+      </div>
+      </td>
+    </tr>
+  </table>
+</dialog>
 
 </p>
 
@@ -1172,6 +1231,16 @@ class hbFont {
     }
     this.otFont = opentype.parse(this.fontBlob);
     this.otLayout = new Layout(this.otFont, 'GPOS');
+
+    // Let's cache the glyph names and the mark class gids
+    this.glyphNameToGid = new Map();
+    this.setGidIsMark = new Set();
+    const max = this.otFont?.glyphs?.length;
+    for (let gid=0;gid<max;gid++) {
+      const gn = this.getGlyphName(gid);
+      this.glyphNameToGid.set(gn?gn:gid, gid);
+      if (this.getGlyphClass(gid) === 3) this.setGidIsMark.add(gid);
+    }
 
     this.gc = new GlyphCompareClass(this.hb);
     this.gc.setFontBlob(this.fontBlob);
@@ -1405,10 +1474,21 @@ class hbFont {
       + ` viewBox="${xmin} ${ymin} ${svgWidth} ${svgHeight}">` +svg+'</svg>'; 
     return svg;
   }
+  getGlyphClass(gid) {
+    return this.otLayout.getGlyphClass(this.otFont.tables.gdef.classDef, gid);
+  }
+  isMarkClass(gid) {
+    return this.setGidIsMark.has(gid);
+    //return (this.getGlyphClass(gid) === 3);
+  }
   getGlyphName(gid) {
     const glyphData = this.otFont?.glyphs?.get(gid);
     if (!glyphData) return undefined;
     return glyphData.name;
+  }
+  getGidFromName(name) {
+    if (!this.glyphNameToGid) return;
+    return this.glyphNameToGid.get(name);
   }
   getGposTableName(idx) {
     if (!this.debugInfo) return null;
@@ -1496,6 +1576,214 @@ function setHarfBuzzFontObjects(hb1, hb2) {
   hbf2.setHarfBuzz(hb2);
 }
 
+// Modified from: https://codereview.stackexchange.com/questions/287630/find-the-longest-common-sequence-in-two-lists
+// same = funcEquiv(e1, e2, i1, i2)
+function findMaxCommonSequence(arrayA, arrayB, funcVal, options) {
+    const n = arrayA.length;
+    const m = arrayB.length;
+
+    if (!funcVal) funcVal = function(e) { return e;};
+
+    // Create a character array to store the lcs string, which is the "Dynamic Programming (DP)" table
+    const dp = new Array(n + 1)
+        .fill(0)
+        .map(() => new Array(m + 1)
+            .fill(0));
+
+    const maxA = (typeof options?.maxA === 'undefined')? -1 : options.maxA;
+    const maxB = (typeof options?.maxB === 'undefined')? -1 : options.maxB;
+
+    // Fill the DP table
+    for (let i = 1; i <= n; i++) {
+        for (let j = 1; j <= m; j++) {
+            const v1 = funcVal(arrayA[i-1]);
+            const v2 = funcVal(arrayB[j-1]);
+            //if (v1 === v2) {
+            let same = (v1 === v2);
+            /*
+            if (same && (maxA >= 0)) {
+              // Check upwards dp[xx][j-1] to see how many have the same value as [j-1]
+              const vc = dp[i-1][j-1];
+              let count = 0;
+              for (let ii=i-2; ii>0; ii--) {
+                const vi = dp[ii][j-1];
+                if (vi === 0) break;
+                if (vc !== vi) break;
+                count++;
+              }
+              if (count >= maxA) same = false;
+            }
+            */
+            /* Does not work!! Only pops out this particular one, not the whole sequence
+            if (same && (maxB >= 0)) {
+              // Check left dp[i-1] to see how many have the same vaule as [j-1]
+              const vc = dp[i-1][j-1];
+              let count = maxB;
+              for (let jj=j-2; jj>0; jj--) {
+                const vj = dp[i-1][jj];
+                if (vj === 0)  break;
+                if (vc !== vj) break;
+                count--;
+                if (count <= 0) {
+                  same = false;
+                  break;
+                }
+              }
+            }
+            */
+            if (same) {
+                dp[i][j] = dp[i - 1][j - 1] + 1;
+            } else {
+                dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+            }
+        }
+    }
+
+    // Reconstruct the longest common subsequence from the dp table
+    let result = [];
+    let i = n;
+    let j = m;
+
+    // Start from the right-most-bottom-most corner and
+    // one by one store characters in lcs[]
+    while (i > 0 && j > 0) {
+        // If current character in X[] and Y are same, then
+        // current character is part of LCS
+        const v1 = funcVal(arrayA[i-1]);
+        const v2 = funcVal(arrayB[j-1]);
+        if (v1 === v2) {
+            result.unshift(v1);
+            i--;
+            j--;
+        } else if (dp[i - 1][j] >= dp[i][j - 1]) {
+            // If not same, then find the larger of two and
+            // go in the direction of larger value
+            i--; // move up in the DP table
+        } else {
+            j--; // move left in the DP table
+        }
+    }
+    result._dp = dp; //~~~~
+    return result;
+}
+
+function splitInfoToGlyphs(txt) {
+  if (!txt) return;
+  const glyphs = txt.startsWith('"')?txt.match(/"←?\s*([^"]+)"/u):txt.match(/←?\s*([^"]+)/u);
+  const ic = [];
+  ic.worst = {
+    index: 0,
+    value: 99, // Yuck
+  };
+  if (glyphs && glyphs[1]) {
+    const arr = glyphs[1].split(' ');
+    arr.forEach(function(g, idx) {
+      const m = g.match(/↳?([🟥🟧🟪🟦🟢🟡]*)([^\s]+)/u); // ignore marker point
+      const icons = m[1];
+      if (icons) {
+        for (let i=0;i<icons.length;i+=2) {
+          const iio = iconsOrder.indexOf(icons.substr(i,2));
+          if (iio < ic.worst.value) {
+            ic.worst.value = iio;
+            ic.worst.index = idx;
+          }
+        }
+      }
+      const seq = m[2];      
+      const gid = hbf1.getGidFromName(seq);
+      const mark = gid? hbf1.isMarkClass(gid):undefined;
+      ic.push({
+        icons: icons,
+        glyph: seq,
+        gid: gid,
+        mark: mark,
+      });
+    });
+  }
+  return ic;
+}
+
+function searchDP(searchText, options) {
+  const minLength = options?.minLength || 2;
+  console.log('>searchDP', options); //~~~~
+  const ts = Date.now();
+  const result = [];
+  const max = wordList.length;
+  const sarr = splitInfoToGlyphs(searchText);
+  for (let i=0; i<max; i++) {
+    const r = findMaxCommonSequence(
+      sarr,
+      wordList[i].infoCache(),
+      (e)=>e.glyph,
+      options);
+    if (r.length >= minLength) {
+      result.push({
+        word: wordList[i].getWord(),
+        res : r,
+        glyphs: wordList[i].infoCache(),       
+        wordEntry: wordList[i], 
+      });
+    }
+  }
+  const te = Date.now();
+  /*
+  result.sort(function(a,b) {
+    const aa = a.res;
+    const ba = b.res;
+    if (aa.length > ba.length) return -1;
+    if (aa.length < ba.length) return  1;
+    for (let i=0; i<aa.length; i++) {
+      if (aa[i] > ba[i]) return 1;
+      if (aa[i] < ba[i]) return -1;
+    }
+    if (a.word > b.word) return 1;
+    if (a.word < b.word) return -1;
+    return 0;
+  });
+  */
+  console.log('searchDP', wordList.length, te-ts, result);
+  return result;
+}
+
+//~~~~
+function testDP() {
+  const a1 = splitInfoToGlyphs('🟥🟪ALIFu1 🟦MADDA BEi16 🟦sda 🟥🟪KASRA REf1');
+  //const a2 = splitInfoToGlyphs('TOEi15 VAOf1 FEi3 sda ALIFf1 NUNu1 sdi KASRA space REu1 FATHA AINi3 DALf1 VAOu1 BEi16 sdb.one REf1 QAFu1 dda');
+  const a2 = splitInfoToGlyphs('sda REf1 NUNu1 sda KASRA REf1 BEi16 sdb sda sdb REf1 QAFu1 dda');
+  console.log(findMaxCommonSequence(a1, a2, (e)=>e.glyph, {maxA:undefined,maxB:undefined}));
+  console.log(findMaxCommonSequence(a1, a2, (e)=>e.glyph, {maxA:2,maxB:1}));
+}
+
+async function patternMatchToClipboard() {
+  const searchText = txtPatternMatchText.value;
+  const options = {
+    minLength: parseInt(txtMinMatch.value, 10),
+    /*
+    maxA : parseInt(txtDist1.value, 10),
+    maxB : parseInt(txtDist2.value, 10),
+    */
+  };
+  const result = searchDP(searchText, options); 
+  // Copy to clipboard as a test...
+  let txt = `# SEARCH PATTERN: ${searchText}<br/>\r\n<br/>\r\n`;
+  //txt += 'Index\tWord\tMatchLength\tInfo\tResult\r\n';
+  txt += 'Word \tInfo \tGlyphCount \tGlyphsMatched<br/>\r\n';
+  result.forEach((entry, index) => {
+    const matched = entry.res.join(' ');
+    //txt += `${index+1}\t${entry.word}\t${entry.res.length}\t${entry.wordEntry.getInfo()}\t${matched}\r\n`
+    txt += `${entry.word} \t${entry.wordEntry.getInfo()} \t${entry.res.length} \t${matched}<br/>\r\n`
+  });
+  //taPatternOutput.value = txt;
+  divPatternOutput.innerHTML = txt;
+  divPatternResults.innerHTML = `Found ${result.length}`;
+}
+
+async function copyPatternResultsToClipboard() {
+  let txt = divPatternOutput.innerHTML;
+  txt = txt.replace(/<br\/?>/g, '');
+  navigator.clipboard.writeText(txt);
+}
+
 class wordEntryClass {
   constructor(line) {
     const tempArray = line.split('\t');
@@ -1513,7 +1801,50 @@ class wordEntryClass {
   setNote(txt)  { this.note = txt; }
   getNote()     { return this.note; }
   getInfo()     { return this.info; }
-  setInfo(txt)  { this.info = txt; }
+  setInfo(txt)  { 
+    if (this.info != txt) this.infoCacheClear();
+    this.info = txt;
+  }
+  infoCacheClear() { delete this.infoCache; }
+  infoCache() {    
+    // Build the cache array for pattern matching and sorting etc
+    if (this._infoCache) return this._infoCache;
+    const txt = this.info;
+    this._infoCache = splitInfoToGlyphs(txt);
+    return this._infoCache;
+  }
+  getWorst() {
+    return this.infoCache().worst;
+  }
+  _compareInfoFrom(idxThis, that, idxThat) {
+    const icThis = this.infoCache();
+    const icThat = that.infoCache();
+    while (idxThis < icThis.length) {
+      if (idxThat >= icThat.length) return 1;
+      const gThis = icThis[idxThis];
+      const gThat = icThat[idxThat];
+      if (gThis.glyph > gThat.glyph) return 1;
+      if (gThis.glyph < gThat.glyph) return -1;
+      idxThis++;
+      idxThat++;
+    }
+    if (idxThat < icThat.length) return -1;
+    return 0;    
+  }
+  compareInfoWorst(that) {
+    const wThis = this.getWorst();
+    const wThat = that.getWorst();
+
+    // Compare the severity (lower comes first)
+    if (wThis.value < wThat.value) return -1;
+    if (wThis.value > wThat.value) return  1;
+
+    // Same value... now need to compare glyphs from the index points forwards
+    let idxThis = wThis.index;
+    let idxThat = wThat.index;
+
+    return this._compareInfoFrom(idxThis, that, idxThat);
+  }
   getDiff()     { return this.diff; }
   setDiff(diff) { this.diff = diffValueToUnicode(diff); }
   setGposData(gpd) { this.gposData = gpd; }
@@ -2863,6 +3194,8 @@ function compareIgnoring(txta, idxa, txtb, idxb, srch) {
 function SortWordListByInfo(e) {
   elementHidePopover(e);
   if (!window.confirm('Sort word list?\r\nCannot be undone!!!')) return;
+
+  /*
   const compareWord = function(a,b) {
     const aw = a.getWord();
     const bw = b.getWord();
@@ -2890,6 +3223,11 @@ function SortWordListByInfo(e) {
     if (ai > bi) return 1;
     if (ai < bi) return -1;
     return compareWord(a,b);
+  }
+  wordList.sort(createCompareFunction(compareInfo));
+  */
+  const compareInfo = function(a,b) {
+    return a.compareInfoWorst(b);
   }
   wordList.sort(createCompareFunction(compareInfo));
   _updateAfterSort();
@@ -3183,6 +3521,17 @@ async function saveToLocalStorage() {
       ls.setItem('font2.name',    hbf2.fontNames.fullName);
       ls.setItem('font2.version', hbf2.fontNames.version);
     }
+    const wlSave = [];
+    wordList.forEach(we => {
+      wlSave.push(
+        {
+          word:     we.word,
+          note:     we.note,
+          checked:  we.checked,
+          info:     we.info,
+        }
+        );
+    });
     const json = JSON.stringify(wordList);
     const buff = await compressStringToArrayBuffer(json);
     const b64 = encodeArrayBufferToBase64(buff);
@@ -3256,6 +3605,7 @@ async function loadFromLocalStorage() {
       const wordEntry = new wordEntryClass(wle.word);
       wordEntry.checked = wle.checked;
       wordEntry.note = wle.note;
+      wordEntry.info = wle.info;
       wordList.push(wordEntry);
       i++;
     }
