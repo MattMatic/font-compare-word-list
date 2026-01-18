@@ -188,7 +188,7 @@ th .dropdown-content{
   border-color: transparent transparent #555 transparent;
 }
 dialog::backdrop {
-  backdrop-filter: blur(2px)
+  backdrop-filter: blur(1.5px)
   /*background-color: hsl(160, 40%, 50%, 0.2);*/
 }
 dialog {
@@ -1077,15 +1077,22 @@ function setFontSize(size) {
   <button type='submit' aria-label='close' onclick='dlgPatternSearch.close();'>X</button>
   <h2>Pattern Search</h2>
   <table border=0>
-    <tr><td>Info Search:</td><td><input class='searchInput' type='text' name='txtPatternMatchText' id='txtPatternMatchText'/></td></tr>
-    <tr><td>Min Count:</td><td><input type='text' id='txtMinMatch' value='2'></input></td></tr>
+    <tr><td>Info Search:</td><td><input style='width:100%;' class='searchInput' type='text' name='txtPatternMatchText' id='txtPatternMatchText'/></td></tr>
+    <tr><td>Parameters:</td>
+      <td>
+        Min Count: <input style='width:10%;' type='text' id='txtMinMatch' value='2'></input> &nbsp;
+        Max Gap: <input style='width:10%;' type='text' id='txtMaxGap' value='1'></input> &nbsp;
+        <input type='checkbox' id='cbPatternSortLength'><label for='cbPatternSortLength'>Length Sort</label></input>
+      </td>
+    </tr>
     <!--
     <br/>Dist 1<input type='text' id='txtDist1' value='1'></input>
     <br/>Dist 2<input type='text' id='txtDist2' value='2'></input>
     -->
     <tr><td> </td><td>
-      <button onclick='patternMatchToClipboard();' id='btnPatternMatch'>Find Matches</button> 
+      <button onclick='patternMatchFind();' id='btnPatternMatch'>Find Matches</button> 
       <button onclick='copyPatternResultsToClipboard();' id='btnPatternMatchCopy'>Copy to Clipboard</button>
+      <button onclick='patternResultsCheckmark();' id='btnPatternResultsCheck'>Checkmark Words</button>
       </td>
     </tr>
     <tr><td>Output:</td><td>
@@ -1579,97 +1586,79 @@ function setHarfBuzzFontObjects(hb1, hb2) {
   hbf2.setHarfBuzz(hb2);
 }
 
-// Modified from: https://codereview.stackexchange.com/questions/287630/find-the-longest-common-sequence-in-two-lists
-// same = funcEquiv(e1, e2, i1, i2)
-function findMaxCommonSequence(arrayA, arrayB, funcVal, options) {
-    const n = arrayA.length;
-    const m = arrayB.length;
+//--v--v--v-- CoPilot Code
 
-    if (!funcVal) funcVal = function(e) { return e;};
 
-    // Create a character array to store the lcs string, which is the "Dynamic Programming (DP)" table
-    const dp = new Array(n + 1)
-        .fill(0)
-        .map(() => new Array(m + 1)
-            .fill(0));
+/**
+ * Longest Common Subsequence with gap constraints.
+ *
+ * @param {Array} A
+ * @param {Array} B
+ * @param {Object} opts
+ * @param {number} opts.maxGapA - max allowed gap in A between matched elements
+ * @param {number} opts.maxGapB - max allowed gap in B between matched elements
+ * @param {Function} opts.equals - comparator (a, b) => boolean
+ *
+ * @returns {Array} the constrained LCS
+ */
+function lcsWithGapConstraints(A, B, opts = {}) {
+  const maxGapA = opts.maxGapA ?? Infinity;
+  const maxGapB = opts.maxGapB ?? Infinity;
+  const equals = opts.equals ?? ((x, y) => x === y);
 
-    const maxA = (typeof options?.maxA === 'undefined')? -1 : options.maxA;
-    const maxB = (typeof options?.maxB === 'undefined')? -1 : options.maxB;
+  const n = A.length;
+  const m = B.length;
 
-    // Fill the DP table
-    for (let i = 1; i <= n; i++) {
-        for (let j = 1; j <= m; j++) {
-            const v1 = funcVal(arrayA[i-1]);
-            const v2 = funcVal(arrayB[j-1]);
-            //if (v1 === v2) {
-            let same = (v1 === v2);
-            /*
-            if (same && (maxA >= 0)) {
-              // Check upwards dp[xx][j-1] to see how many have the same value as [j-1]
-              const vc = dp[i-1][j-1];
-              let count = 0;
-              for (let ii=i-2; ii>0; ii--) {
-                const vi = dp[ii][j-1];
-                if (vi === 0) break;
-                if (vc !== vi) break;
-                count++;
-              }
-              if (count >= maxA) same = false;
-            }
-            */
-            /* Does not work!! Only pops out this particular one, not the whole sequence
-            if (same && (maxB >= 0)) {
-              // Check left dp[i-1] to see how many have the same vaule as [j-1]
-              const vc = dp[i-1][j-1];
-              let count = maxB;
-              for (let jj=j-2; jj>0; jj--) {
-                const vj = dp[i-1][jj];
-                if (vj === 0)  break;
-                if (vc !== vj) break;
-                count--;
-                if (count <= 0) {
-                  same = false;
-                  break;
-                }
-              }
-            }
-            */
-            if (same) {
-                dp[i][j] = dp[i - 1][j - 1] + 1;
-            } else {
-                dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
-            }
+  // DP[i][j] = best LCS ending at A[i], B[j]
+  const DP = Array.from({ length: n }, () =>
+    Array.from({ length: m }, () => ({
+      length: 0,
+      prev: null
+    }))
+  );
+
+  let best = { length: 0, i: -1, j: -1 };
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < m; j++) {
+      if (!equals(A[i], B[j])) continue;
+
+      // Start a new subsequence
+      DP[i][j].length = 1;
+
+      // Try to extend from previous matches
+      for (let pi = Math.max(0, i - maxGapA - 1); pi < i; pi++) {
+        for (let pj = Math.max(0, j - maxGapB - 1); pj < j; pj++) {
+          if (DP[pi][pj].length + 1 > DP[i][j].length) {
+            DP[i][j].length = DP[pi][pj].length + 1;
+            DP[i][j].prev = [pi, pj];
+          }
         }
-    }
+      }
 
-    // Reconstruct the longest common subsequence from the dp table
-    let result = [];
-    let i = n;
-    let j = m;
-
-    // Start from the right-most-bottom-most corner and
-    // one by one store characters in lcs[]
-    while (i > 0 && j > 0) {
-        // If current character in X[] and Y are same, then
-        // current character is part of LCS
-        const v1 = funcVal(arrayA[i-1]);
-        const v2 = funcVal(arrayB[j-1]);
-        if (v1 === v2) {
-            result.unshift(v1);
-            i--;
-            j--;
-        } else if (dp[i - 1][j] >= dp[i][j - 1]) {
-            // If not same, then find the larger of two and
-            // go in the direction of larger value
-            i--; // move up in the DP table
-        } else {
-            j--; // move left in the DP table
-        }
+      // Track global best
+      if (DP[i][j].length > best.length) {
+        best = { length: DP[i][j].length, i, j };
+      }
     }
-    result._dp = dp; //~~~~
-    return result;
+  }
+
+  // Reconstruct LCS
+  const result = [];
+  let cur = best.i >= 0 ? [best.i, best.j] : null;
+
+  while (cur) {
+    const [i, j] = cur;
+    result.push(A[i]);
+    cur = DP[i][j].prev;
+  }
+
+  return result.reverse();
 }
+//--^--^--^--
 
+// WARNING: this is a fragile extraction.
+//          If Font Force Field outputs different info, this will fail.
 function splitInfoToGlyphs(txt) {
   if (!txt) return;
   const glyphs = txt.startsWith('"')?txt.match(/"←?\s*([^"]+)"/u):txt.match(/←?\s*([^"]+)/u);
@@ -1678,6 +1667,7 @@ function splitInfoToGlyphs(txt) {
     index: 0,
     value: 99, // Yuck
   };
+  ic.rtl = txt.includes('←');
   if (glyphs && glyphs[1]) {
     const glyphsTxt = glyphs[1].trim();
     const arr = glyphsTxt.split(' ');
@@ -1699,6 +1689,7 @@ function splitInfoToGlyphs(txt) {
       const gid = hbf1.getGidFromName(seq);
       const mark = gid? hbf1.isMarkClass(gid):undefined;
       ic.push({
+        idx: idx,
         icons: icons,
         glyph: seq,
         gid: gid,
@@ -1711,17 +1702,15 @@ function splitInfoToGlyphs(txt) {
 
 function searchDP(searchText, options) {
   const minLength = options?.minLength || 2;
-  console.log('>searchDP', options); //~~~~
   const ts = Date.now();
   const result = [];
   const max = wordList.length;
   const sarr = splitInfoToGlyphs(searchText);
+  options.equals = function(a,b) {
+    return (a.glyph === b.glyph);
+  }
   for (let i=0; i<max; i++) {
-    const r = findMaxCommonSequence(
-      sarr,
-      wordList[i].infoCache(),
-      (e)=>e.glyph,
-      options);
+    const r = lcsWithGapConstraints(wordList[i].infoCache(), sarr, options);
     if (r.length >= minLength) {
       result.push({
         word: wordList[i].getWord(),
@@ -1732,42 +1721,53 @@ function searchDP(searchText, options) {
     }
   }
   const te = Date.now();
-  /*
-  result.sort(function(a,b) {
-    const aa = a.res;
-    const ba = b.res;
-    if (aa.length > ba.length) return -1;
-    if (aa.length < ba.length) return  1;
-    for (let i=0; i<aa.length; i++) {
-      if (aa[i] > ba[i]) return 1;
-      if (aa[i] < ba[i]) return -1;
-    }
-    if (a.word > b.word) return 1;
-    if (a.word < b.word) return -1;
-    return 0;
-  });
-  */
-  console.log('searchDP', wordList.length, te-ts, result);
+  if (options.sortByLength) {
+    result.sort(function(a,b) {
+      const aa = a.res;
+      const ba = b.res;
+      if (aa.length > ba.length) return -1;
+      if (aa.length < ba.length) return  1;
+      for (let i=0; i<aa.length; i++) {
+        if (aa[i] > ba[i]) return 1;
+        if (aa[i] < ba[i]) return -1;
+      }
+      if (a.word > b.word) return 1;
+      if (a.word < b.word) return -1;
+      return 0;
+    });
+  }
+  //~~//console.log('searchDP', wordList.length, te-ts, result);//~~
   return result;
 }
 
 //~~~~
 function testDP() {
-  const a1 = splitInfoToGlyphs('🟥🟪ALIFu1 🟦MADDA BEi16 🟦sda 🟥🟪KASRA REf1');
+
+  function eq(a,b) {
+    return a.glyph === b.glyph;
+  }
+
+
+  const a1 = splitInfoToGlyphs('← 🟥🟪ALIFu1 🟦MADDA BEi16 🟦sda 🟥🟪KASRA REf1');
   //const a2 = splitInfoToGlyphs('TOEi15 VAOf1 FEi3 sda ALIFf1 NUNu1 sdi KASRA space REu1 FATHA AINi3 DALf1 VAOu1 BEi16 sdb.one REf1 QAFu1 dda');
-  const a2 = splitInfoToGlyphs('sda REf1 NUNu1 sda KASRA REf1 BEi16 sdb sda sdb REf1 QAFu1 dda');
-  console.log(findMaxCommonSequence(a1, a2, (e)=>e.glyph, {maxA:undefined,maxB:undefined}));
-  console.log(findMaxCommonSequence(a1, a2, (e)=>e.glyph, {maxA:2,maxB:1}));
+  const a2 = splitInfoToGlyphs('sda REf1 NUNu1 sdb KASRA REf1 BEi16 sdb sda sdb REf1 QAFu1 dda');
+
+  console.log(lcsWithGapConstraints(a1, a2, {
+    maxGapA: 2,
+    maxGapB: 2,
+    equals: eq,
+  }));
 }
 
-async function patternMatchToClipboard() {
+let patternResults = [];
+
+async function patternMatchFind() {
   const searchText = txtPatternMatchText.value;
   const options = {
     minLength: parseInt(txtMinMatch.value, 10),
-    /*
-    maxA : parseInt(txtDist1.value, 10),
-    maxB : parseInt(txtDist2.value, 10),
-    */
+    maxGapA: parseInt(txtMaxGap.value, 10),
+    maxGapB: parseInt(txtMaxGap.value, 10),
+    sortByLength: cbPatternSortLength.checked,
   };
   const result = searchDP(searchText, options); 
   // Copy to clipboard as a test...
@@ -1775,26 +1775,32 @@ async function patternMatchToClipboard() {
   //txt += 'Index\tWord\tMatchLength\tInfo\tResult\r\n';
   //txt += 'Word \tInfo \tGlyphCount \tGlyphsMatched<br/>\r\n';
   txt += 'Word \tInfo \tGlyphCount<br/>\r\n';
+  patternResults.length = 0;
   result.forEach((entry, index) => {
     const matched = entry.res.join(' ');
     //txt += `${index+1}\t${entry.word}\t${entry.res.length}\t${entry.wordEntry.getInfo()}\t${matched}\r\n`
-    let glyphs = '';
+    let glyphs = '"';
     let im=0;
     const ic = entry.wordEntry.infoCache();
+    patternResults.push(entry);
+    if (ic.rtl) glyphs += `← `;
     ic.forEach((e)=> {
       let highlight = false;
       if (im<entry.res.length) {
-        if (entry.res[im] === e.glyph) {
+        // NOTE: for this to work, the first term to the LCS function must be the word
+        //       and the second term must the item to search for.
+        if (entry.res[im].idx === e.idx) {
           highlight = true;
           im++;
         }
-        glyphs += e.icons;
-        if (highlight)
-          glyphs += `<span class='HiLite'>${e.glyph}</span> `;
-        else
-          glyphs += `${e.glyph} `;
       }
+      glyphs += e.icons;
+      if (highlight)
+        glyphs += `<span class='HiLite'>${e.glyph}</span> `;
+      else
+        glyphs += `${e.glyph} `;
     });
+    glyphs = glyphs.trim() + '"';
 
     //txt += `${entry.word} \t${entry.wordEntry.getInfo()} \t${entry.res.length} \t${matched}<br/>\r\n`
     txt += `${entry.word} \t${glyphs} \t${entry.res.length}<br/>\r\n`
@@ -1809,6 +1815,14 @@ async function copyPatternResultsToClipboard() {
   //txt = txt.replace(/<br\/?>/g, '');
   const txt = divPatternOutput.textContent;
   navigator.clipboard.writeText(txt);
+}
+
+function patternResultsCheckmark() {
+  patternResults.forEach((e)=>e.wordEntry.setChecked(true));
+  window.alert(`Checked ${patternResults.length} words`);
+  updateCheckListCount();
+  checkListHasChanged();
+  updateListByField();
 }
 
 class wordEntryClass {
@@ -3799,6 +3813,6 @@ showFontTwo(false);
 
 </script>
 
-</br>Tool Version: 2026-01-16 p</p>
+</br>Tool Version: 2026-01-18 k</p>
 </body>
 </html>
