@@ -902,7 +902,7 @@ function setFontSize(size) {
     <a href='#' onclick='openFontCompareTool(this);' title='Send checked words to HarfBuzz Font Compare Tool'>➜ Font Compare</a></br>
     <a href='#' onclick='openFontForceFieldTool(this);' title='Send checked words to Font Force Field Tool'>➜ Force Field</a></br>
 
-    <span id='gidGposAnalytics' hidden><a href='#' onclick='processChecklistGpos(this);' title='Process GPOS/GID data'>📈 Glyph/GPOS analytics</a></span></br>
+    <span id='gidGposAnalytics' hidden><a href='#' onclick='processChecklistGpos(gidGposAnalytics);' title='Process GPOS/GID data'>📈 Glyph/GPOS analytics</a></span></br>
     </div>
   </div>
 
@@ -1774,7 +1774,7 @@ async function patternMatchFind() {
   let txt = `# SEARCH PATTERN: ${searchText}<br/>\r\n<br/>\r\n`;
   //txt += 'Index\tWord\tMatchLength\tInfo\tResult\r\n';
   //txt += 'Word \tInfo \tGlyphCount \tGlyphsMatched<br/>\r\n';
-  txt += 'Word \tInfo \tGlyphCount<br/>\r\n';
+  txt += '# Word \tInfo \tGlyphCount<br/>\r\n';
   patternResults.length = 0;
   result.forEach((entry, index) => {
     const matched = entry.res.join(' ');
@@ -1909,6 +1909,7 @@ class wordEntryClass {
     this.note = diffValueToNote(this.note, diffs);
   }
   cacheClear() {
+    this.infoCacheClear();
     delete this.area;
     delete this.diffArea;
     delete this.gposData;
@@ -3813,6 +3814,6 @@ showFontTwo(false);
 
 </script>
 
-</br>Tool Version: 2026-01-18 k</p>
+</br>Tool Version: 2026-01-19 k</p>
 </body>
 </html>
