@@ -1091,7 +1091,7 @@ function setFontSize(size) {
     -->
     <tr><td> </td><td>
       <button onclick='patternMatchFind();' id='btnPatternMatch'>Find Matches</button> 
-      <button onclick='copyPatternResultsToClipboard();' id='btnPatternMatchCopy'>Copy to Clipboard</button>
+      <!--<button onclick='copyPatternResultsToClipboard();' id='btnPatternMatchCopy'>Copy to Clipboard</button>-->
       <button onclick='patternResultsCheckmark();' id='btnPatternResultsCheck'>Checkmark Words</button>
       </td>
     </tr>
@@ -1660,13 +1660,13 @@ function lcsWithGapConstraints(A, B, opts = {}) {
 // WARNING: this is a fragile extraction.
 //          If Font Force Field outputs different info, this will fail.
 function splitInfoToGlyphs(txt) {
-  if (!txt) return;
-  const glyphs = txt.startsWith('"')?txt.match(/"←?\s*([^"]+)"/u):txt.match(/←?\s*([^"]+)/u);
   const ic = [];
   ic.worst = {
     index: 0,
     value: 99, // Yuck
   };
+  if (!txt) return ic;
+  const glyphs = txt.startsWith('"')?txt.match(/"←?\s*([^"]+)"/u):txt.match(/←?\s*([^"]+)/u);
   ic.rtl = txt.includes('←');
   if (glyphs && glyphs[1]) {
     const glyphsTxt = glyphs[1].trim();
@@ -1716,7 +1716,8 @@ function searchDP(searchText, options) {
         word: wordList[i].getWord(),
         res : r,
         glyphs: wordList[i].infoCache(),       
-        wordEntry: wordList[i], 
+        wordEntry: wordList[i],
+        index: i,
       });
     }
   }
@@ -1727,12 +1728,14 @@ function searchDP(searchText, options) {
       const ba = b.res;
       if (aa.length > ba.length) return -1;
       if (aa.length < ba.length) return  1;
+      if (a.index < b.index) return -1;
+      if (a.index > b.index) return  1;
+      /*
       for (let i=0; i<aa.length; i++) {
         if (aa[i] > ba[i]) return 1;
         if (aa[i] < ba[i]) return -1;
       }
-      if (a.word > b.word) return 1;
-      if (a.word < b.word) return -1;
+      */
       return 0;
     });
   }
@@ -1771,10 +1774,10 @@ async function patternMatchFind() {
   };
   const result = searchDP(searchText, options); 
   // Copy to clipboard as a test...
-  let txt = `# SEARCH PATTERN: ${searchText}<br/>\r\n<br/>\r\n`;
+  let txt = `\t# SEARCH PATTERN: ${searchText}<br/>\r\n<br/>\r\n`;
   //txt += 'Index\tWord\tMatchLength\tInfo\tResult\r\n';
   //txt += 'Word \tInfo \tGlyphCount \tGlyphsMatched<br/>\r\n';
-  txt += '# Word \tInfo \tGlyphCount<br/>\r\n';
+  txt += '\t# Word \tInfo \tGlyphCount<br/>\r\n';
   patternResults.length = 0;
   result.forEach((entry, index) => {
     const matched = entry.res.join(' ');
@@ -1810,12 +1813,14 @@ async function patternMatchFind() {
   divPatternResults.innerHTML = `Found ${result.length}`;
 }
 
+/*
 async function copyPatternResultsToClipboard() {
   //let txt = divPatternOutput.innerHTML;
   //txt = txt.replace(/<br\/?>/g, '');
   const txt = divPatternOutput.textContent;
   navigator.clipboard.writeText(txt);
 }
+*/
 
 function patternResultsCheckmark() {
   patternResults.forEach((e)=>e.wordEntry.setChecked(true));
@@ -1870,6 +1875,8 @@ class wordEntryClass {
       idxThat++;
     }
     if (idxThat < icThat.length) return -1;
+    if (this.word < that.word) return -1;
+    if (this.word > that.word) return  1;
     return 0;    
   }
   compareInfoWorst(that) {
