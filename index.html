@@ -1092,6 +1092,7 @@ function setFontSize(size) {
     <tr><td> </td><td>
       <button onclick='patternMatchFind();' id='btnPatternMatch'>Find Matches</button> 
       <!--<button onclick='copyPatternResultsToClipboard();' id='btnPatternMatchCopy'>Copy to Clipboard</button>-->
+      <button onclick='DownloadPatternResults();' id='btnPatternDownload'>Download Results</button>
       <button onclick='patternResultsCheckmark();' id='btnPatternResultsCheck'>Checkmark Words</button>
       </td>
     </tr>
@@ -1779,6 +1780,7 @@ async function patternMatchFind() {
   //txt += 'Word \tInfo \tGlyphCount \tGlyphsMatched<br/>\r\n';
   txt += '\t# Word \tInfo \tGlyphCount<br/>\r\n';
   patternResults.length = 0;
+  patternResults.searchText = searchText;
   result.forEach((entry, index) => {
     const matched = entry.res.join(' ');
     //txt += `${index+1}\t${entry.word}\t${entry.res.length}\t${entry.wordEntry.getInfo()}\t${matched}\r\n`
@@ -3520,6 +3522,25 @@ function DownloadCheckList(e) {
   saveTextToFile(txt, 'CheckList.'+DateTimeForFilename()+'.txt');
 }
 
+function DownloadPatternResults() {
+  if (patternResults.length == 0) {
+    window.alert("No pattern results to save!");
+    return;
+  }
+  let txt = '';
+  txt += `\t#\tSEARCH: \t${patternResults.searchText}\r\n`;
+  if (hbf1.fontNames) {
+    txt += `\t#\t"FONT1","${hbf1.fontNames.fullName}","${hbf1.fontNames.version}","HarfBuzz ${hbf1.hbVersion}"\r\n`;
+  }
+  if (hbf2.fontNames) {
+    txt += `\t#\t"FONT2","${hbf2.fontNames.fullName}","${hbf2.fontNames.version}","HarfBuzz ${hbf2.hbVersion}"\r\n`;
+  }
+  patternResults.forEach(entry=> {
+    txt = txt + entry.wordEntry.getLine()+'\n';
+  });
+  saveTextToFile(txt, 'CheckList.Patterns.'+DateTimeForFilename()+'.txt');  
+}
+
 
 // Ref: https://gist.github.com/Explosion-Scratch/357c2eebd8254f8ea5548b0e6ac7a61b
 function compressStringToArrayBuffer(txt, encoding = 'gzip') {
@@ -3818,9 +3839,8 @@ patchDragDrop(fontTwoInfoCell, handleFontTwoDrop);
 
 showFontTwo(false);
 
-
 </script>
 
-</br>Tool Version: 2026-01-19 k</p>
+</br>Tool Version: 2026-01-20 k</p>
 </body>
 </html>
