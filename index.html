@@ -877,18 +877,24 @@ function setFontSize(size) {
     <button class='menubtn' popovertarget='ddWordList' style='anchor-name: --ddmenu-wl;'>🔤Word List</button>
     <div class='menu-content' id='ddWordList' style='position-anchor: --ddmenu-wl;' popover>
     <a href='#' onclick='DownloadCheckList(this);' title='Save check list to file'>⏬Download</a></br>
-    <!--<a href='#' onclick='pasteUniqueWords();' title='Paste Unique words - new words are checked'>⭐Paste Unique</a></br>-->
     </div>
   </div>
   <div class='dropdown'>
     <button class='menubtn' popovertarget='ddSortList' style='anchor-name: --ddmenu-sort;'>📊Sort</button>
     <div class='menu-content' id='ddSortList' style='position-anchor: --ddmenu-sort;' popover>
-    <p><input type='checkbox' id='cbCheckedFirst' checked><label for='cbCheckedFirst'>Checked + …</label></input></p>
-    <a href='#' onclick='SortWordList(this, false);' title='Sort by Word'>🔤Word</a></br>
-    <!--<a href='#' onclick='SortWordList(this, false, true);'  title='Sort by Check then Word'>✅Check + Word</a></br>-->
-    <a href='#' onclick='SortWordList(this, true);'  title='Sort by Note then Word'>📓Note + Word</a></br>
-    <a href='#' onclick='SortWordListByInfo(this);'  title='Sort by FFFT Info'>🟥Force Field Glyph Info + Word</a></br>
-    <a href='#' onclick='SortWordListArea(this);'  title='Sort by Difference Area'>📐Area + Word</a></br>
+    <a href='#' onclick='SortList(this);' title='Sort'>📊Sort Now</a>
+    <table border=0 width='100%'>
+      <tr><td width='75%'>1. Checkmark</td><td><input type='checkbox' id='cbCheckedFirst' checked></input></td></tr>
+      <tr><td>2. Force Field Glyph Info</td><td><input type='checkbox' id='cbSortForceField'></input></td></tr>
+      <tr><td>3. Note</td><td><input type='checkbox' id='cbSortNote'></input></td></tr>
+      <tr><td>4. Area</td><td><input type='checkbox' id='cbSortArea'></input></td></tr>
+      <tr><td>5. Second List</td><td><input type='checkbox' id='cbSortSecondList' disabled></input></td></tr>
+      <tr><td>6. Word</td><td><input type='checkbox' id='cbSortWord'></input></td></tr>
+      <tr><td>7. Original order</td><td><input type='checkbox' id='cbSortOriginal' checked disabled></input></td></tr>
+    </table>
+    <br/>
+    <a href='#' onclick='SortListFreeze(this);'>❄️Freeze Sort Order</a>
+    <a href='#' onclick='LoadSecondFile(this);'>🔃Load Second List</a>
     </div>
   </div>
   <div class='dropdown'>
@@ -1839,7 +1845,7 @@ class wordEntryClass {
     this.note = tempArray[1] || '';
     //this.diff = tempArray[2] || '';
     this.diff = '';
-    this.info = tempArray.slice(2).join('\t');
+    this.info = tempArray.slice(2).join('\t') || '';
     this.checked = false;
     //??//this.checked = (tempArray[2] === 'x') || (tempArray[2] === 'X'); //??
   }
@@ -1966,6 +1972,7 @@ class wordEntryClass {
 }
 
 var wordList = []; // An array of wordEntry objects
+var secondList = undefined; //new Map(); // To hold a secondary sort order
 
 function fontsHaveChanged() {
   const size = wordList.length;
@@ -2032,6 +2039,7 @@ function findWordInList(theList, theWord, cache)
 }
 
 function addToList(theList, wordListEntry, cache) {
+  wordList.original_index = theList.length;
   theList.push(wordListEntry);
   cache[wordListEntry.getWord()] = theList.length - 1;
 } 
@@ -3121,7 +3129,21 @@ function _updateAfterSort() {
 }
 
 
-function compareChecked(a,b) {
+//---v---v---v---v---v---v---v---v---v---v---
+// Sort comparison functions
+function sort_word(a,b) {
+  const aw = a.getWord();
+  const bw = b.getWord();
+  if (aw < bw) return -1;
+  if (aw > bw) return 1;
+  return 0;
+}
+
+function sort_force_field(a,b) {
+  return a.compareInfoWorst(b);
+}
+
+function sort_checkmark(a,b) {
   if (a.getChecked()) {
     if (b.getChecked())
       return 0;
@@ -3132,55 +3154,125 @@ function compareChecked(a,b) {
   return 0;
 }
 
-// Create the 'checked' first option
-function createCompareFunction(foo) {
-  if (!cbCheckedFirst.checked) return foo;
+function sort_note(a,b) {
+  const aw = a.getNote();
+  const bw = b.getNote();
+  if (aw < bw) {
+    if (aw === '') return 1;
+    return -1;
+  }
+  if (aw > bw) {
+    if (bw === '') return -1;
+    return 1;
+  }
+  return 0;
+}
+
+function sort_original(a,b) {
+  if (a.original_index < b.original_index) return -1;
+  if (a.original_index > b.original_index) return  1;
+  return 0;
+}
+
+function sort_area(a,b) {
+  const da = a.getDifferenceArea();
+  const db = b.getDifferenceArea();
+  if (da > db) return -1;
+  if (da < db) return  1;
+  return 0;
+}
+
+function sort_second_list(a,b) {
+  const sa = secondList.get(a.getWord());
+  const sb = secondList.get(b.getWord());
+  if (typeof sa !== 'number') {
+    if (typeof sb !== 'number')
+      return 0;
+    else
+      return 1;
+  }
+  if (typeof sb !== 'number')
+    return -1;
+  if (sa < sb) return -1;
+  if (sa > sb) return  1;
+  return 0;
+}
+
+function sortBuild(arr) {
   return function(a,b) {
-    const r = compareChecked(a,b);
-    if (r != 0) return r;
-    return foo(a,b);
+    for (let i=0;i<arr.length;i++) {
+      const r = arr[i](a,b);
+      if (r != 0) return r;
+    }
+    return 0;
+  }
+}
+//---^---^---^---^---^---^---^---^---^---^---
+function load_second_file(file, e) {
+  if (!file) return;
+  const fileName = file.name.toLowerCase();
+  if (!fileName.endsWith('.txt')) return;
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var txt = e.target.result;
+    secondList = new Map();
+    // work through all lines...
+    const lines = txt.split(/\r?\n+/g);
+    for (i=0;i<lines.length;i++) {
+      const line = lines[i];
+      const m = line.match(/^([^\s#]+)/u);
+      if (m && m[1]) {
+        secondList.set(m[1], i);
+      }
+    }
+    if (secondList.size == 0) {
+      secondList = undefined;
+      window.alert('Loaded nothing!');
+      cbSortSecondList.checked = false;
+      cbSortSecondList.disabled = true;
+    } else {
+      window.alert(`Loaded ${secondList.size} words`);
+      cbSortSecondList.disabled = false;
+    }
+  }
+  reader.readAsText(file);  
+}
+
+function LoadSecondFile() {
+  chooseFile( load_second_file );
+}
+
+function SortList(e) {
+  elementHidePopover(e);
+  if (!window.confirm('Sort word list?\r\nCannot be undone!!!')) return;
+
+  const sortArray = [];
+  if (cbCheckedFirst.checked) sortArray.push(sort_checkmark);
+  if (cbSortForceField.checked) sortArray.push(sort_force_field);
+  if (cbSortNote.checked) sortArray.push(sort_note);
+  if (cbSortArea.checked) sortArray.push(sort_area);
+  if (cbSortSecondList.checked && secondList) sortArray.push(sort_second_list);
+  if (cbSortWord.checked)
+    sortArray.push(sort_word);
+  else
+    sortArray.push(sort_original);
+
+  if (cbSortArea.checked) {
+    HBCGlive.checked = true;
+    CheckDifferentGlyphs( () => {
+      wordList.sort( sortBuild(sortArray) );
+      _updateAfterSort();
+    });
+  } else {
+    wordList.sort( sortBuild(sortArray) );
+    _updateAfterSort();
   }
 }
 
-function SortWordList(e, sortByNote/*, byChecked*/) {
-  elementHidePopover(e);
-  if (!window.confirm('Sort word list?\r\nCannot be undone!!!')) return;
-  var compareWord = function(a,b) {
-    const aw = a.getWord();
-    const bw = b.getWord();
-    if (aw < bw) return -1;
-    if (aw > bw) return 1;
-    return 0;
-  }
-  var compareNote = function(a,b) {
-    const aw = a.getNote();
-    const bw = b.getNote();
-    if (aw < bw) {
-      if (aw === '') return 1;
-      return -1;
-    }
-    if (aw > bw) {
-      if (bw === '') return -1;
-      return 1;
-    }
-    return compareWord(a, b);
-  }
-  var compareCheck = function(a,b) {
-    if (a.getChecked()) {
-      if (b.getChecked())
-        return compareWord(a,b);
-      return -1;
-    }
-    if (b.getChecked()) {
-      return 1;
-    }
-    return compareWord(a,b);
-  }
-  if (sortByNote)
-    wordList.sort(createCompareFunction(compareNote));
-  else
-    wordList.sort(createCompareFunction(compareWord));
-  _updateAfterSort();
+function SortListFreeze(e) {
+  if (!window.confirm('Freeze the sort order?\r\nCannot be undone!!!')) return;
+  wordList.forEach((e,idx)=>{e.original_index = idx;});
 }
 
 const iconsOrder = [
@@ -3217,96 +3309,6 @@ function findContainsAny(txt, srch) {
   };
 }
 
-function compareIgnoring(txta, idxa, txtb, idxb, srch) {
-  while (idxa < txta.length) {
-    if (idxb >= txtb.length) return 1;
-
-    const ca = txta.codePointAt(idxa);
-    if (srch.indexOf(String.fromCodePoint(ca))>= 0) {
-      idxa += (ca>0xffff)?2:1;
-      continue;
-    }
-    
-    const cb = txtb.codePointAt(idxb);
-    if (srch.indexOf(String.fromCodePoint(cb))>= 0) {
-      idxb += (cb>0xffff)?2:1;
-      continue;
-    }
-
-    if (ca > cb) return 1;
-    if (ca < cb) return -1;
-    idxa += (ca>0xffff)?2:1;
-    idxb += (cb>0xffff)?2:1;
-  }
-  if (idxb < txtb.length) return -1;
-  return 0;
-}
-
-function SortWordListByInfo(e) {
-  elementHidePopover(e);
-  if (!window.confirm('Sort word list?\r\nCannot be undone!!!')) return;
-
-  /*
-  const compareWord = function(a,b) {
-    const aw = a.getWord();
-    const bw = b.getWord();
-    if (aw < bw) return -1;
-    if (aw > bw) return 1;
-    return 0;
-  }
-
-  const compareInfo = function(a,b) {
-    const ai = a.getInfo();
-    const bi = b.getInfo();
-
-    // Find the icons by order of Font Force Field Info output.
-    const air = findContainsAny(ai, iconsOrder);
-    const bir = findContainsAny(bi, iconsOrder);
-
-    // Compare the first icon initially
-    if (air.search > bir.search) return 1;
-    if (air.search < bir.search) return -1;
-    // Compare from air.index and bir.index onwards
-    // skip past any icons to compare the glyphs only
-    const r = compareIgnoring(ai, air.index, bi, bir.index, iconsOrder);
-    if (r != 0) return r;
-
-    if (ai > bi) return 1;
-    if (ai < bi) return -1;
-    return compareWord(a,b);
-  }
-  wordList.sort(createCompareFunction(compareInfo));
-  */
-  const compareInfo = function(a,b) {
-    return a.compareInfoWorst(b);
-  }
-  wordList.sort(createCompareFunction(compareInfo));
-  _updateAfterSort();
-}
-
-function SortWordListArea(e) {
-  elementHidePopover(e);
-  if (!window.confirm('Sort word list?\r\nCannot be undone!!!')) return;
-  HBCGlive.checked = true;
-  CheckDifferentGlyphs( () => {
-    var compare = function(a,b) {
-      let da = a.getDifferenceArea();
-      let db = b.getDifferenceArea();
-      if (da > db)
-        return -1;
-      if (da < db)
-        return 1;
-      const aw = a.getWord();
-      const bw = b.getWord();
-      if (aw < bw) return -1;
-      if (aw > bw) return 1;
-      return 0;
-    }
-    wordList.sort(compare);
-    _updateAfterSort();    
-  });
-}
-
 function DeleteAll(e) {
   elementHidePopover(e);
   if (!window.confirm('Delete all words?\r\nCannot be undone!!!')) return;
@@ -3315,84 +3317,6 @@ function DeleteAll(e) {
   updateCheckListCount();
   updateListByIndex(1);
   updateStatusMessage(-1);
-}
-
-// See: https://github.com/MattMatic/unique-words
-function findUniqueWords(input, options) {
-  let lang = options.language;
-  if (lang === '') lang = 'en';
-  let segmenter = new Intl.Segmenter(lang, {granularity: 'word'});
-  let segments = segmenter.segment(input);
-  let words = {};
-  for (let {segment, index, isWordLike} of segments) {
-    if (isWordLike) {
-      let hasNumbers =  /\d/.test(segment);
-      if (!hasNumbers || options.numbers) {
-        if (options.normalize) segment = segment.normalize();
-        words[segment] = true;  // Assimilate a list
-      }
-    }
-  }
-  var res = [];
-  for (const word in words) {
-    res.push(word);
-  }
-  if (options.sort) {
-    res.sort();
-  }
-  return res;
-}
-
-function assimilateText(input) {
-  var options = {
-    language: HTMLLang.value,
-    sort: true,
-    numbers: false,
-  }
-  var words = findUniqueWords(input, options);
-
-  const wordsLength = words.length;
-  const inputShort = input.substring(1, 40);
-  const confirmMessage = 'Paste '+wordsLength+' unique words from "'+inputShort+'..." ?';
-  if (!window.confirm(confirmMessage)) {
-    return;
-  }
-  var count = 0;
-  var cache = {};
-  words.forEach( (w) =>  {
-    var mi = findWordInList(wordList, w, cache);
-    if (mi >= 0) {
-      // Found the word
-    } else {
-      const newEntry = new wordEntryClass(w);
-      count++;
-      newEntry.setChecked(true);
-      addToList(wordList, newEntry, cache);
-    }
-  });
-  checkListHasChanged();
-  updateCheckListCount();
-  updateListByField();
-  UpdateWordCount();  
-  window.alert(count+' new words were added');
-}
-
-async function pasteUniqueWords() {
-  // Access clipboard and use Intl.segmenter to pull out words
-  let input = '';
-  try {
-    const clipboardContents = await navigator.clipboard.read();
-    for (const item of clipboardContents) {
-      if (item.types.includes('text/plain')) {
-        const blob = await item.getType('text/plain');
-        const blobText = await blob.text();
-        assimilateText(blobText);
-      }
-    }
-  } catch (error) {
-    console.log(error.message);
-  }
-  if (!wordlist_filename) wordlist_filename = '(clipboard)';
 }
 
 var hbfcw = null;
@@ -3469,6 +3393,7 @@ function acquireFontAndLists(w) {
     wordEntry.checked = xwe.checked;
     wordEntry.note = xwe.note;
     wordEntry.info = xwe.info;
+    wordEntry.original_index = i;
     wordList.push(wordEntry);    
   }
   applyFontX(null, 'Test_Font_1', fontOneInfo, hbf1, xfer.fontBlob);
@@ -3676,6 +3601,7 @@ async function loadFromLocalStorage() {
       wordEntry.checked = wle.checked;
       wordEntry.note = wle.note;
       wordEntry.info = wle.info;
+      wordEntry.original_index = i;
       wordList.push(wordEntry);
       i++;
     }
@@ -3841,6 +3767,6 @@ showFontTwo(false);
 
 </script>
 
-</br>Tool Version: 2026-01-20 k</p>
+</br>Tool Version: 2026-01-20 n</p>
 </body>
 </html>
