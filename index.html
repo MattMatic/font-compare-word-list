@@ -83,11 +83,11 @@ td {
   cursor: pointer;
   font-weight: bold;
   font-size: 100%;
-  anchor-name: var(--ddmenu);
+  /*anchor-name: var(--ddmenu);*/
 }
 .menu-content {
   position: absolute;
-  position-anchor: var(--ddmenu);
+  /*position-anchor: var(--ddmenu);*/
   inset: auto;
   top: anchor(bottom);
   left: anchor(left);
@@ -874,15 +874,15 @@ function setFontSize(size) {
 
 <!-- Menus Start -->
   <div class='dropdown'>
-    <button class='menubtn' popovertarget='ddWordList'>🔤Word List</button>
-    <div class='menu-content' id='ddWordList' popover>
+    <button class='menubtn' popovertarget='ddWordList' style='anchor-name: --ddmenu-wl;'>🔤Word List</button>
+    <div class='menu-content' id='ddWordList' style='position-anchor: --ddmenu-wl;' popover>
     <a href='#' onclick='DownloadCheckList(this);' title='Save check list to file'>⏬Download</a></br>
     <!--<a href='#' onclick='pasteUniqueWords();' title='Paste Unique words - new words are checked'>⭐Paste Unique</a></br>-->
     </div>
   </div>
   <div class='dropdown'>
-    <button class='menubtn' popovertarget='ddSortList'>📊Sort</button>
-    <div class='menu-content' id='ddSortList' popover>
+    <button class='menubtn' popovertarget='ddSortList' style='anchor-name: --ddmenu-sort;'>📊Sort</button>
+    <div class='menu-content' id='ddSortList' style='position-anchor: --ddmenu-sort;' popover>
     <p><input type='checkbox' id='cbCheckedFirst' checked><label for='cbCheckedFirst'>Checked + …</label></input></p>
     <a href='#' onclick='SortWordList(this, false);' title='Sort by Word'>🔤Word</a></br>
     <!--<a href='#' onclick='SortWordList(this, false, true);'  title='Sort by Check then Word'>✅Check + Word</a></br>-->
@@ -892,8 +892,8 @@ function setFontSize(size) {
     </div>
   </div>
   <div class='dropdown'>
-    <button class='menubtn' popovertarget='ddCheckList'>✅Check List</button>
-    <div class='menu-content' id='ddCheckList' popover>
+    <button class='menubtn' popovertarget='ddCheckList' style='anchor-name: --ddmenu-cl;'>✅Check List</button>
+    <div class='menu-content' id='ddCheckList' style='position-anchor: --ddmenu-cl;' popover>
     <a href='#' onclick='ClearCheckListUser(this);' title='Remove check from all words'>⬜Clear All</a></br>
     <a href='#' onclick='CheckAllList(this);' title='Check all words'>✅Set All</a></br>
     <a href='#' onclick='InvertCheckList(this);' title='Toggle check for all words'>🔵Invert</a></br>
@@ -907,8 +907,8 @@ function setFontSize(size) {
   </div>
 
   <div class='dropdown'>
-    <button class='menubtn' popovertarget='ddSearch'>🔍Search</button>
-    <div class='menu-content' id='ddSearch' popover>
+    <button class='menubtn' popovertarget='ddSearch' style='anchor-name: --ddmenu-search;'>🔍Search</button>
+    <div class='menu-content' id='ddSearch' style='position-anchor: --ddmenu-search;' popover>
       <table border=0>
         <tr><th>Notes:</th><td><input class='searchInput' type='text' name='regExpNotes' id='regExpNotes'/></td></tr>
         <tr><th>Info:</th><td><input class='searchInput' type='text' name='regExpInfo' id='regExpInfo'/>
@@ -934,12 +934,12 @@ function setFontSize(size) {
   </div>
 
   <div class='dropdown'>
-    <button class='menubtn' onclick='dlgPatternSearch.showModal();' id='btnPatternSearch'>🎶Patterns</button>
+    <button class='menubtn' onclick='dlgPatternSearch.showModal();' id='btnPatternSearch' style='anchor-name: --ddmenu-pattern;'>🎶Patterns</button>
   </div>
 
   <div class='dropdown'>
-    <button class='menubtn' popovertarget='ddHarfBuzz'>&#x1F30D;HarfBuzz</button>
-    <div class='menu-content' id='ddHarfBuzz' popover>
+    <button class='menubtn' popovertarget='ddHarfBuzz' style='anchor-name: --ddmenu-hb;'>&#x1F30D;HarfBuzz</button>
+    <div class='menu-content' id='ddHarfBuzz' style='position-anchor: --ddmenu-hb;' popover>
       <table border=0>
         <tr><th width='20%'>HTML Lang:</th><td><input type='text' id='HTMLLang' oninput='updateLanguage();' title='Web page language ID'/></td></tr>
         <tr><th>Script:</th><td>
@@ -1017,8 +1017,8 @@ function setFontSize(size) {
   </div>      
 
   <div class='dropdown'>
-    <button class='menubtn' popovertarget='ddDelete'>❌Delete</button>
-    <div class='menu-content' id='ddDelete' popover>
+    <button class='menubtn' popovertarget='ddDelete' style='anchor-name: --ddmenu-del;'>❌Delete</button>
+    <div class='menu-content' id='ddDelete' style='position-anchor: --ddmenu-del;' popover>
     <a href='#' onclick='DeleteDuplicates(this);' title='Remove all duplicate words'>📚Delete Duplicates</a></br>
     <a href='#' onclick='RemoveUnchecked(this);' title='Remove all words that are NOT checked (cannot be undone!)'>❌Delete Unchecked</a></br>
     <a href='#' onclick='DeleteAll(this);' title='Remove all words (cannot be undone!)'>⛔Delete All</a></br>
