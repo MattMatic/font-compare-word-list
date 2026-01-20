@@ -729,6 +729,24 @@ function gotoOrFind() {
   }
 }
 
+function gotoNextCheck(direction) {
+  let index = start_index - 1;
+
+  const wasChecked = wordList[index].getChecked();
+  const list_length = wordList.length;
+  index += direction;
+  while ((index < list_length) && (index >= 0)) {
+    const entry = wordList[index];
+    if (entry.getChecked() != wasChecked) {
+      start_index = index + 1;
+      setStart(start_index);
+      updateListByIndex(start_index);
+      break;
+    }
+    index += direction;
+  }
+}
+
 function updateListByField() {
   start_index = getStart();
   if (start_index <= 1) start_index = 1;
@@ -844,7 +862,10 @@ function setFontSize(size) {
   <tr>
     <td width='22%'>
       <label for='start'>Start:</label><input type='text' id='start' placeholder='Start' value='1' width='8'/>
-      <button onclick='gotoOrFind();' title='Jump to "Start" as a line number, or &#13;&#10; search for the text in "Start"'>Go</button><br/>
+      <button onclick='gotoOrFind();' title='Jump to "Start" as a line number, or &#13;&#10; search for the text in "Start"'>Go</button>
+      <button onclick='gotoNextCheck(-1);'><<</button>
+      <button onclick='gotoNextCheck(1);'>>></button>
+      <br/>
       Page:<input type='radio' name='perPage' value=5 onclick='updatePerPage(5);' checked><label>5</label>
       <input type='radio' name='perPage' value=10 onclick='updatePerPage(10);'><label>10</label>
       <input type='radio' name='perPage' value=25 onclick='updatePerPage(25);'><label>25</label>
@@ -882,7 +903,6 @@ function setFontSize(size) {
   <div class='dropdown'>
     <button class='menubtn' popovertarget='ddSortList' style='anchor-name: --ddmenu-sort;'>📊Sort</button>
     <div class='menu-content' id='ddSortList' style='position-anchor: --ddmenu-sort;' popover>
-    <a href='#' onclick='SortList(this);' title='Sort'>📊Sort Now</a>
     <table border=0 width='100%'>
       <tr><td width='75%'>1. Checkmark</td><td><input type='checkbox' id='cbCheckedFirst' checked></input></td></tr>
       <tr><td>2. Force Field Glyph Info</td><td><input type='checkbox' id='cbSortForceField'></input></td></tr>
@@ -892,7 +912,8 @@ function setFontSize(size) {
       <tr><td>6. Word</td><td><input type='checkbox' id='cbSortWord'></input></td></tr>
       <tr><td>7. Original order</td><td><input type='checkbox' id='cbSortOriginal' checked disabled></input></td></tr>
     </table>
-    <br/>
+    <a href='#' onclick='SortList(this);' title='Sort'>📊Sort Now</a>
+    <hr/>
     <a href='#' onclick='SortListFreeze(this);'>❄️Freeze Sort Order</a>
     <a href='#' onclick='LoadSecondFile(this);'>🔃Load Second List</a>
     </div>
@@ -1083,7 +1104,12 @@ function setFontSize(size) {
   <button type='submit' aria-label='close' onclick='dlgPatternSearch.close();'>X</button>
   <h2>Pattern Search</h2>
   <table border=0>
-    <tr><td>Info Search:</td><td><input style='width:100%;' class='searchInput' type='text' name='txtPatternMatchText' id='txtPatternMatchText'/></td></tr>
+    <tr>
+      <td>Info Search:</td>
+      <td><input style='width:100%;' class='searchInput' type='text' name='txtPatternMatchText' id='txtPatternMatchText'/>
+      HINT: Use `/.../` for regular expressions.
+      </td>
+    </tr>
     <tr><td>Parameters:</td>
       <td>
         Min Count: <input style='width:10%;' type='text' id='txtMinMatch' value='2'></input> &nbsp;
@@ -1707,15 +1733,28 @@ function splitInfoToGlyphs(txt) {
   return ic;
 }
 
+// Allows for glyph B to be a regular expression
+function glyphsAreEqual(a, b) {
+  const ga = a.glyph;
+  const gb = b.glyph;
+  if (typeof gb !== 'object')
+    return ga === gb;
+  return gb.test(ga);
+}
+
 function searchDP(searchText, options) {
   const minLength = options?.minLength || 2;
   const ts = Date.now();
   const result = [];
   const max = wordList.length;
   const sarr = splitInfoToGlyphs(searchText);
-  options.equals = function(a,b) {
-    return (a.glyph === b.glyph);
+  for (let i=0; i<sarr.length; i++) {
+    const rule = sarr[i].glyph;
+    if (rule.startsWith('/') && rule.endsWith('/')) {
+      sarr[i].glyph = new RegExp(rule.slice(1, -1), 'u');
+    }
   }
+  options.equals = glyphsAreEqual;
   for (let i=0; i<max; i++) {
     const r = lcsWithGapConstraints(wordList[i].infoCache(), sarr, options);
     if (r.length >= minLength) {
@@ -3221,7 +3260,7 @@ function load_second_file(file, e) {
     const lines = txt.split(/\r?\n+/g);
     for (i=0;i<lines.length;i++) {
       const line = lines[i];
-      const m = line.match(/^([^\s#]+)/u);
+      const m = line.match(/^([^#][^\s]+)/u);  // Extract a word at the beginning - up to a space or hash
       if (m && m[1]) {
         secondList.set(m[1], i);
       }
