@@ -459,7 +459,7 @@ function escapeQuotes(txt, quote) {
 
 function BuildNoteHtml(n) {
   var txt = '';
-  txt += `<input type="text" class="note" onchange="NoteUpdate(this);" onkeyup="NoteUpdate(this); name="note${n+1}" value="${wordList[n].getNote()}">`;
+  txt += `<input type="text" class="note" onchange="NoteUpdate(this);" onkeyup="NoteUpdate(this);" name="note${n+1}" value="${wordList[n].getNote()}">`;
 //  txt += `<br/><font size=-1>info:<input type="text" class="info" onchange="InfoUpdate(this);" onkeyup="InfoUpdate(this); name="info${n+1}" value='${escapeQuotes(wordList[n].getInfo())}''></font>`;
   txt += `<br><font size=-1>Info:<textarea class='info' onchange='InfoUpdate(this);' onkeyup='InfoUpdate(this);' rows=3 name='info${n+1}'>${wordList[n].getInfo()}</textarea>`;
   return txt;
@@ -944,6 +944,9 @@ function setFontSize(size) {
         </td></tr>
         <tr><th>Word:</th><td><input class='searchInput' type='text' name='regExpWord' id='regExpWord'/></td></tr>
         <tr><th>Glyph(s):</th><td><input class='searchInput' type='text' name='regExpGlyph' id='regExpGlyph' title='Integer or string. Separate gids or expressions with a comma.&#13;&#10;To search for sequences of glyph-sets separate each set with ||' disabled/>
+        <br/><font size='-1'>HINT: Prefix with ← to reverse the order.</font>
+        <br/><font size='-1'>HINT: Separate glyphs with a comma to create sets.</font>
+        <br/><font size='-1'>HINT: Separate sets or glyphs with || to find sequences.</font>
         </td></tr>
         <tr><th>GPOS:</th><td><input class='searchInput' type='text' name='regExpGpos' id='regExpGpos' title='Integer or string. Separate multiple with comma' disabled/>
         </td></tr>
@@ -1137,6 +1140,7 @@ function setFontSize(size) {
       </td>
     </tr>
   </table>
+  <font size='-1'>Force Field Glyph Info: 🟥GG 🟧cb 🟪cx 🟦cm 🟢glue 🟡gap</font>
 </dialog>
 
 </p>
@@ -2677,7 +2681,11 @@ async function CheckmarkRegExp() {
   const infoSearchTerm = infoRE ? regExpInfo.value.replace(infoRE, '') : regExpInfo.value;
   const expInfo = createRegExp(infoSearchTerm);
   const expWord = createRegExp(regExpWord.value);
-  const glyphChunk = regExpGlyph.value.split('||');
+  let reGlyph = regExpGlyph.value.trim();
+  const rtlOrder = reGlyph.startsWith('←');
+  if (rtlOrder) reGlyph = reGlyph.slice(1).trim();
+  const glyphChunk = reGlyph.split('||');
+  if (rtlOrder) glyphChunk.reverse();
   const gidSet = [];
   glyphChunk.forEach((v,i) => {
     const expListGlyph = createRegExpList(v);
@@ -3806,6 +3814,6 @@ showFontTwo(false);
 
 </script>
 
-</br>Tool Version: 2026-01-22 i</p>
+</br>Tool Version: 2026-01-22 j</p>
 </body>
 </html>
