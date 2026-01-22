@@ -102,7 +102,7 @@ td {
   color: black;
   padding: 8px 12px;
   text-decoration: none;
-  display: block;  
+  display: block;
 }
 .menu-content a:hover {background-color: #cee;}
 
@@ -577,7 +577,7 @@ function addEntry(table, lineNo, theWordEntry) {
 
   var phrase = theWordEntry.getWord();
   hbf1.shape(phrase);
-  theWordEntry.updateGids(hbf1);  
+  theWordEntry.updateGids(hbf1);
   hbf2.shape(phrase);
   var diff = hbf1.compare(hbf2, tolCompare);
   theWordEntry.setDiff(diff);
@@ -603,8 +603,8 @@ function addEntry(table, lineNo, theWordEntry) {
   //~~//html += `<span class="test_2" style="color: #ff6600;">${phrase}</span><br><span class="test_1">${phrase}</span>`;
   html += hbf1.genSVGcombined(phrase, hbf2, true,
     {
-      width:200, 
-      height:100, 
+      width:200,
+      height:100,
       scale:svgScale,
       font1:svgFont1,
       font2:svgFont2,
@@ -951,7 +951,7 @@ function setFontSize(size) {
         <tr><th>Check:</th><td>
           <input type='radio' name='regExpOp' value='check' checked><label for='check'>Check</label></br>
           <input type='radio' name='regExpOp' value='uncheck'><label for='uncheck'>Uncheck</label></br>
-          <input type='radio' name='regExpOp' value='invert'><label for='invert'>Invert</label>          
+          <input type='radio' name='regExpOp' value='invert'><label for='invert'>Invert</label>
         </td></tr>
         <tr><th></th><td>
           <button onclick='ddSearch.hidePopover(); CheckmarkRegExp();' title='Run regular expression and adjust check'>Search</button>
@@ -1034,14 +1034,14 @@ function setFontSize(size) {
           </td>
         </tr>
         <tr>
-        <th></th>  
+        <th></th>
           <td>
             <input type='checkbox' id='HBCGlive' onchange='updateHBCGlive();'>Show data in table</input>
           </td>
         </tr>
       </table>
     </div>
-  </div>      
+  </div>
 
   <div class='dropdown'>
     <button class='menubtn' popovertarget='ddDelete' style='anchor-name: --ddmenu-del;'>❌Delete</button>
@@ -1056,7 +1056,7 @@ function setFontSize(size) {
 <table border=2 cellspacing="8px" width='100%' id='word_list'>
   <tr>
     <th width='16%' id='checkListHeading'>
-      # / Note</br><span style='font-size:75%' id='CheckListCount'></span>      
+      # / Note</br><span style='font-size:75%' id='CheckListCount'></span>
     </th>
     <th width='6%'>
       <!--<a href='javascript:void(0)' onclick='toggleHBIcons();'>Diff</a>-->
@@ -1122,7 +1122,7 @@ function setFontSize(size) {
     <br/>Dist 2<input type='text' id='txtDist2' value='2'></input>
     -->
     <tr><td> </td><td>
-      <button onclick='patternMatchFind();' id='btnPatternMatch'>Find Matches</button> 
+      <button onclick='patternMatchFind();' id='btnPatternMatch'>Find Matches</button>
       <!--<button onclick='copyPatternResultsToClipboard();' id='btnPatternMatchCopy'>Copy to Clipboard</button>-->
       <button onclick='DownloadPatternResults();' id='btnPatternDownload'>Download Results</button>
       <button onclick='patternResultsCheckmark();' id='btnPatternResultsCheck'>Checkmark Words</button>
@@ -1231,7 +1231,7 @@ class hbFont {
     this.setFontBlob(fbOld);
   }
   destroy() {
-    this.freeFontBlob();    
+    this.freeFontBlob();
   }
   freeFontBlob() {
     this.freeFont();
@@ -1312,7 +1312,7 @@ class hbFont {
       const addFunction = this.hb.hooks.addFunction;
       const removeFunction = this.hb.hooks.removeFunction;
       const utf8Decoder = this.hb.hooks.utf8Decoder;
-      const Module = this.hb.hooks.Module;    
+      const Module = this.hb.hooks.Module;
       var traceFunc = function(bufferPtr, fontPtr, messagePtr, user_data) {
         return 1;
       }
@@ -1453,7 +1453,7 @@ class hbFont {
     }
     if (settings.mixBlendMode !== 'normal')
       this.svgData +=';mix-blend-mode:\''+settings.mixBlendMode+'\''
-    
+
     this.svgData += '" d="';
     const size = ps64.size();
     for (let i=0;i<size;i++) {
@@ -1514,7 +1514,7 @@ class hbFont {
 
     svg = '<svg xmlns="http://www.w3.org/2000/svg"'
       + ` height="${height}" width="${width}"`
-      + ` viewBox="${xmin} ${ymin} ${svgWidth} ${svgHeight}">` +svg+'</svg>'; 
+      + ` viewBox="${xmin} ${ymin} ${svgWidth} ${svgHeight}">` +svg+'</svg>';
     return svg;
   }
   getGlyphClass(gid) {
@@ -1718,7 +1718,7 @@ function splitInfoToGlyphs(txt) {
           }
         }
       }
-      const seq = m[2];      
+      const seq = m[2];
       const gid = hbf1.getGidFromName(seq);
       const mark = gid? hbf1.isMarkClass(gid):undefined;
       ic.push({
@@ -1761,7 +1761,7 @@ function searchDP(searchText, options) {
       result.push({
         word: wordList[i].getWord(),
         res : r,
-        glyphs: wordList[i].infoCache(),       
+        glyphs: wordList[i].infoCache(),
         wordEntry: wordList[i],
         index: i,
       });
@@ -1818,7 +1818,7 @@ async function patternMatchFind() {
     maxGapB: parseInt(txtMaxGap.value, 10),
     sortByLength: cbPatternSortLength.checked,
   };
-  const result = searchDP(searchText, options); 
+  const result = searchDP(searchText, options);
   // Copy to clipboard as a test...
   let txt = `\t# SEARCH PATTERN: ${searchText}<br/>\r\n<br/>\r\n`;
   //txt += 'Index\tWord\tMatchLength\tInfo\tResult\r\n';
@@ -1894,12 +1894,12 @@ class wordEntryClass {
   setNote(txt)  { this.note = txt; }
   getNote()     { return this.note; }
   getInfo()     { return this.info; }
-  setInfo(txt)  { 
+  setInfo(txt)  {
     if (this.info != txt) this.infoCacheClear();
     this.info = txt;
   }
   infoCacheClear() { delete this.infoCache; }
-  infoCache() {    
+  infoCache() {
     // Build the cache array for pattern matching and sorting etc
     if (this._infoCache) return this._infoCache;
     const txt = this.info;
@@ -1924,7 +1924,7 @@ class wordEntryClass {
     if (idxThat < icThat.length) return -1;
     if (this.word < that.word) return -1;
     if (this.word > that.word) return  1;
-    return 0;    
+    return 0;
   }
   compareInfoWorst(that) {
     const wThis = this.getWorst();
@@ -1948,8 +1948,8 @@ class wordEntryClass {
   getGidData() { return this.gidData; }
   // The line for the check list file output
   getLine() {
-    var txt = this.word + 
-        '\t' + (this.note || '') + 
+    var txt = this.word +
+        '\t' + (this.note || '') +
         //'\t' + (this.diff || '') +
         '\t' + (this.info || '');
     while (txt.endsWith('\t')) {
@@ -2081,7 +2081,7 @@ function addToList(theList, wordListEntry, cache) {
   wordList.original_index = theList.length;
   theList.push(wordListEntry);
   cache[wordListEntry.getWord()] = theList.length - 1;
-} 
+}
 
 function updateCheckListCount() {
   var count = getWordCheckCount();
@@ -2408,7 +2408,7 @@ function extractGposData(trace) {
     const m3e = msg.match(/^end lookup (\d+) feature '(\w+)'/);
     const m4 = msg.match(/^recursing to lookup (\d+)/);
     const m4e = msg.match(/^recursed to lookup (\d+)/);
-    if (m3) { 
+    if (m3) {
       gposTable = parseInt(m3[1], 10);
       stack.push(gposTable);
     }
@@ -2521,13 +2521,13 @@ async function processChecklistGpos(e) {
     if (et.elapsed()) {
       updateStatusMessage(i, 0, size);
       //mapCountsToDisplay(bit_counts);
-      await scheduler.yield();      
+      await scheduler.yield();
     }
     if (AbortLongRunning) {
       aborted = true;
       break;
     }
-  } 
+  }
   doneLongRunning();
 
   if (aborted) return;
@@ -2553,7 +2553,7 @@ async function processChecklistGpos(e) {
   html += `,"TOTAL"`;
   html += '\r\n';
 
-  html += `"","(Depth)"`;  
+  html += `"","(Depth)"`;
   gposSet.forEach( function(item, gpos) {
     const gposDepth = setToArraySortedNumerically(gposDepths[gpos]);
     let txt = '';
@@ -2677,7 +2677,7 @@ async function CheckmarkRegExp() {
   const infoSearchTerm = infoRE ? regExpInfo.value.replace(infoRE, '') : regExpInfo.value;
   const expInfo = createRegExp(infoSearchTerm);
   const expWord = createRegExp(regExpWord.value);
-  const glyphChunk = regExpGlyph.value.split('||');  
+  const glyphChunk = regExpGlyph.value.split('||');
   const gidSet = [];
   glyphChunk.forEach((v,i) => {
     const expListGlyph = createRegExpList(v);
@@ -2771,7 +2771,7 @@ async function CheckmarkRegExp() {
     if (et.elapsed()) {
       updateStatusMessage(i, count, size);
       //mapCountsToDisplay(bit_counts);
-      await scheduler.yield();      
+      await scheduler.yield();
     }
     if (AbortLongRunning) {
       break;
@@ -2808,8 +2808,8 @@ function isLongRunning() {
 
 // polyfill for scheduler.yield
 globalThis.scheduler = globalThis.scheduler || {};
-globalThis.scheduler.yield = 
-  globalThis.scheduler.yield || 
+globalThis.scheduler.yield =
+  globalThis.scheduler.yield ||
   (() => new Promise((r) => setTimeout(r, 0)));
 
 class ElapsedTimer {
@@ -2934,7 +2934,7 @@ async function CheckSimilar() {
     if (et.elapsed()) {
       updateStatusMessage(i, checkCount, total);
       mapCountsToDisplay(bit_counts);
-      await scheduler.yield();      
+      await scheduler.yield();
     }
     if (AbortLongRunning) {
       break;
@@ -2980,7 +2980,7 @@ async function CheckDifferentGlyphs(onCompletion) {
       if (diffs >= tolerance) {
         wordList[i].setChecked(true);
         checkCount++;
-      }      
+      }
     }
 
     if (et.elapsed()) {
@@ -3066,7 +3066,7 @@ async function UpdateDifferences() {
 
     if (et.elapsed()) {
       updateStatusMessage(i, checkCount, total);
-      await scheduler.yield();      
+      await scheduler.yield();
     }
 
     if (AbortLongRunning) {
@@ -3101,7 +3101,7 @@ async function RemoveUnchecked(e) {
     if (wle.getChecked()) {
       newWordList.push(wle);
     } else {
-      deletedCount++;      
+      deletedCount++;
     }
     if (et.elapsed()) {
       updateStatusMessage(i, deletedCount, size);
@@ -3275,7 +3275,7 @@ function load_second_file(file, e) {
       cbSortSecondList.disabled = false;
     }
   }
-  reader.readAsText(file);  
+  reader.readAsText(file);
 }
 
 function LoadSecondFile() {
@@ -3422,7 +3422,7 @@ function acquireFontAndLists(w) {
   inputScript.value = xfer.script;
   inputLanguage.value   = xfer.language;
   wordlist_filename = xfer.wordListFileName;
-  
+
   // xfer.wordList
   wordList = [];
   const size = xfer.wordList.length;
@@ -3433,7 +3433,7 @@ function acquireFontAndLists(w) {
     wordEntry.note = xwe.note;
     wordEntry.info = xwe.info;
     wordEntry.original_index = i;
-    wordList.push(wordEntry);    
+    wordList.push(wordEntry);
   }
   applyFontX(null, 'Test_Font_1', fontOneInfo, hbf1, xfer.fontBlob);
   // Not font 2...
@@ -3502,7 +3502,7 @@ function DownloadPatternResults() {
   patternResults.forEach(entry=> {
     txt = txt + entry.wordEntry.getLine()+'\n';
   });
-  saveTextToFile(txt, 'CheckList.Patterns.'+DateTimeForFilename()+'.txt');  
+  saveTextToFile(txt, 'CheckList.Patterns.'+DateTimeForFilename()+'.txt');
 }
 
 
