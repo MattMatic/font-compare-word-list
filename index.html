@@ -2318,7 +2318,7 @@ function createRegExpList(txt) {
   const expList = [];
   const isInteger = new RegExp('^[0-9]+$');
   for (let i=0; i<txtList.length; i++) {
-    const entry = txtList[i];
+    const entry = txtList[i].trim();
     if (isInteger.test(entry)) {
       expList.push(parseInt(entry));
     } else {
@@ -3806,6 +3806,6 @@ showFontTwo(false);
 
 </script>
 
-</br>Tool Version: 2026-01-20 n</p>
+</br>Tool Version: 2026-01-22 i</p>
 </body>
 </html>
