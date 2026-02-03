@@ -219,6 +219,10 @@ dialog {
   overflow-x: scroll;
   font-family: monospace;
 }
+.prWord {
+  display: inline-block;
+  min-width: 100px;
+}
 </style>
 
 <script type="text/javascript" src="./js/hbjs-11.0.1/hb.js"></script> <!-- Module - REQUIRED -->
@@ -1830,7 +1834,10 @@ async function patternMatchFind() {
   txt += '\t# Word \tInfo \tGlyphCount<br/>\r\n';
   patternResults.length = 0;
   patternResults.searchText = searchText;
-  result.forEach((entry, index) => {
+  const maxResults = 2000;
+  const maxIndex = (result.length > maxResults) ? maxResults : result.length;
+  for (let index=0; index<maxIndex; index++) {
+    const entry = result[index];
     const matched = entry.res.join(' ');
     //txt += `${index+1}\t${entry.word}\t${entry.res.length}\t${entry.wordEntry.getInfo()}\t${matched}\r\n`
     let glyphs = '"';
@@ -1857,11 +1864,12 @@ async function patternMatchFind() {
     glyphs = glyphs.trim() + '"';
 
     //txt += `${entry.word} \t${entry.wordEntry.getInfo()} \t${entry.res.length} \t${matched}<br/>\r\n`
-    txt += `${entry.word} \t${glyphs} \t${entry.res.length}<br/>\r\n`
-  });
+    txt += `<span class='prWord'>${entry.word}</span> \t${glyphs} \t${entry.res.length}<br/>\r\n`
+  }
   //taPatternOutput.value = txt;
   divPatternOutput.innerHTML = txt;
   divPatternResults.innerHTML = `Found ${result.length}`;
+  if (maxIndex == maxResults) divPatternResults.innerHTML += `<font color='red'> Only ${maxIndex} shown</font>`;
 }
 
 /*
@@ -3814,6 +3822,6 @@ showFontTwo(false);
 
 </script>
 
-</br>Tool Version: 2026-01-22 j</p>
+</br>Tool Version: 2026-02-03 j</p>
 </body>
 </html>
