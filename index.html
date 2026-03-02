@@ -602,19 +602,30 @@ function addEntry(table, lineNo, theWordEntry) {
   }
   cell = row.insertCell(idx++);
 
-  let html = `<p class="overlap" id="overlap${lineNo}">`;
+  if (!svgFont1 && !svgFont2) {
+    cell.innerHTML =
+        //'<p style="line-height: 0px; " align="center">'
+        '<p class="overlap" id="overlap'+lineNo+'">'
+      + '<span class="test_2" style="color: #ff6600;">' + phrase + '</span><br>'
+      + '<span class="test_1">' + phrase + '</span></p>'
 
-  //~~//html += `<span class="test_2" style="color: #ff6600;">${phrase}</span><br><span class="test_1">${phrase}</span>`;
-  html += hbf1.genSVGcombined(phrase, hbf2, true,
-    {
-      width:200,
-      height:100,
-      scale:svgScale,
-      font1:svgFont1,
-      font2:svgFont2,
-    });
-  html += '</p>';
-  cell.innerHTML = html;
+    const displayValue = window.getComputedStyle(fontOverlap).display;
+    cell.style.display = displayValue;
+  } else {
+    let html = `<p class="overlap" id="overlap${lineNo}">`;
+
+    //~~//html += `<span class="test_2" style="color: #ff6600;">${phrase}</span><br><span class="test_1">${phrase}</span>`;
+    html += hbf1.genSVGcombined(phrase, hbf2, true,
+      {
+        width:200,
+        height:100,
+        scale:svgScale,
+        font1:svgFont1,
+        font2:svgFont2,
+      });
+    html += '</p>';
+    cell.innerHTML = html;
+  }
 }
 
 function UpdateListener(id, event, foo) {
@@ -823,14 +834,19 @@ function cssRulesIterate(func) {
   }
 }
 
-function setFontSize(size) {
+function setFontSizeWhich(size, which) {
   cssRulesIterate(rule => {
-    if (rule.selectorText.startsWith('.test_')) {
+    if (rule.selectorText.startsWith(which)) {
       rule.style.fontSize = size;
     }
   });
   svgScale = parseInt(size, 10) / 2;
   updateListByField();
+}
+
+function setFontSize(size, side) {
+  if (!side) side = '';
+  setFontSizeWhich(size, `.test_`+side);
 }
 
 </script>
@@ -1080,11 +1096,11 @@ function setFontSize(size) {
       <div class='dropdown'>
         <button class='dropbtn'>…</button>
         <div class='dropdown-content'>
-          <button class='dropbtn' style='width:50%' onclick='setFontSize("100%");'>100%</button></br>
-          <button class='dropbtn' style='width:50%' onclick='setFontSize("200%");'>200%</button></br>
-          <button class='dropbtn' style='width:50%' onclick='setFontSize("300%");'>300%</button></br>
-          <button class='dropbtn' style='width:50%' onclick='setFontSize("400%");'>400%</button></br>
-          <button class='dropbtn' style='width:50%' onclick='setFontSize("500%");'>500%</button></br>
+          <button class='dropbtn' style='width:50%' onclick='setFontSize("100%", 1);'>100%</button></br>
+          <button class='dropbtn' style='width:50%' onclick='setFontSize("200%", 1);'>200%</button></br>
+          <button class='dropbtn' style='width:50%' onclick='setFontSize("300%", 1);'>300%</button></br>
+          <button class='dropbtn' style='width:50%' onclick='setFontSize("400%", 1);'>400%</button></br>
+          <button class='dropbtn' style='width:50%' onclick='setFontSize("500%", 1);'>500%</button></br>
         </div>
       </div>
     </th>
@@ -1095,6 +1111,12 @@ function setFontSize(size) {
         <div class='dropdown-content'>
           <button class='dropbtn' style='width:50%' onclick='showFontTwo(false);'>Hide</button></br>
           <button class='dropbtn' style='width:50%' onclick='showFontTwo(true);'>Show</button>
+          <p/>
+          <button class='dropbtn' style='width:50%' onclick='setFontSize("100%", 2);'>100%</button></br>
+          <button class='dropbtn' style='width:50%' onclick='setFontSize("200%", 2);'>200%</button></br>
+          <button class='dropbtn' style='width:50%' onclick='setFontSize("300%", 2);'>300%</button></br>
+          <button class='dropbtn' style='width:50%' onclick='setFontSize("400%", 2);'>400%</button></br>
+          <button class='dropbtn' style='width:50%' onclick='setFontSize("500%", 2);'>500%</button></br>          
         </div>
       </div>
     </th>
@@ -1103,6 +1125,8 @@ function setFontSize(size) {
       <input type='radio' name='hbShow' value='one' onclick='updateHbShow(true, false);'>Font 1</input>
       <input type='radio' name='hbShow' value='two' onclick='updateHbShow(false, true);'>Font 2</input>
       <input type='radio' name='hbShow' value='overlap' onclick='updateHbShow(true, true);' checked>Overlap</input>
+      <br/>
+      <input type='radio' name='hbShow' value='browser' onclick='updateHbShow(false, false);'>Browser Overlap</input>
     </th>
   </tr>
 </table>
@@ -3822,6 +3846,6 @@ showFontTwo(false);
 
 </script>
 
-</br>Tool Version: 2026-02-03 j</p>
+</br>Tool Version: 2026-03-02 g</p>
 </body>
 </html>
