@@ -3300,7 +3300,7 @@ function load_second_file(file, e) {
     const lines = txt.split(/\r?\n+/g);
     for (i=0;i<lines.length;i++) {
       const line = lines[i];
-      const m = line.match(/^([^#][^\s]+)/u);  // Extract a word at the beginning - up to a space or hash
+      const m = line.match(/^([^\s]?[^#\s]+)/u);  // Extract a word at the beginning - up to a space or hash
       if (m && m[1]) {
         secondList.set(m[1], i);
       }
@@ -3846,6 +3846,6 @@ showFontTwo(false);
 
 </script>
 
-</br>Tool Version: 2026-03-02 g</p>
+</br>Tool Version: 2026-03-05 g</p>
 </body>
 </html>
