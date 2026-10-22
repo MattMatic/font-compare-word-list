@@ -1550,6 +1550,7 @@ class hbFont {
     return svg;
   }
   getGlyphClass(gid) {
+    if (!this.otFont.tables.gdef) return 0;
     return this.otLayout.getGlyphClass(this.otFont.tables.gdef.classDef, gid);
   }
   isMarkClass(gid) {
@@ -3846,6 +3847,6 @@ showFontTwo(false);
 
 </script>
 
-</br>Tool Version: 2026-03-05 g</p>
+</br>Tool Version: 2026-10-22 1100</p>
 </body>
 </html>
