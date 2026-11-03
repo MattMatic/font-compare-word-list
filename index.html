@@ -236,6 +236,8 @@ import {CPaths64, GlyphCompareClass} from './js/glyphcompare.mjs';
 
 import * as opentype from './js/opentype.min.mjs';
 import Layout from './js/opentype.layout.gdef.mjs';
+import { HB_VERSIONS, loadHarfBuzz } from './js/hb-engine.mjs';
+window.hbEngine = { HB_VERSIONS, loadHarfBuzz };
 window.opentype = opentype;
 window.Layout = Layout;
 
@@ -256,6 +258,7 @@ function onResourcesLoaded() {
 
 createHarfBuzz().then(hbmodule=>{
   const hb = loadedHarfBuzzModule(hbmodule);
+  window.hbDrawEngine = hb;   // draws glyph outlines for engines without raw WASM access (harfbuzzjs 1.x)
   setHarfBuzzFontObjects(hb, hb);
   onResourcesLoaded();
 });
@@ -273,28 +276,29 @@ var svgFont2 = true;
 let hbVersions = [];
 
 async function loadHarfBuzzVersion(hbf, version) {
-  if (hbVersions[version]) {
-    hbf.setHarfBuzz(hbVersions[version]);
-    updateListByField();
+  // Bundled builds load from ./js/hbjs-<version>/, the rest from the jsDelivr CDN (see js/hb-engine.mjs)
+  let hb = hbVersions[version];
+  if (!hb) {
+    try {
+      hb = await window.hbEngine.loadHarfBuzz(version);
+    } catch (err) {
+      console.error(err);
+      window.alert(`Could not load HarfBuzz ${version}
+${err.message}`);
+      // put the drop-down back to what is really in use
+      const sel = document.getElementById(hbf === hbf1 ? 'hbVersion1' : 'hbVersion2');
+      if (sel && hbf.hbVersion) sel.value = hbf.hbVersion;
+      return;
+    }
+    hbVersions[version] = hb;
   }
-  const scriptSource = `./js/hbjs-${version}/hb.js`;
-  const newScriptElement = document.createElement('script');
-  newScriptElement.onload = function() {
-    createHarfBuzz().then(hbmodule=>{
-      loadedHarfBuzzModule(hbmodule);
-      hbf.setHarfBuzz(hbVersions[version]);
-      if (hbf === hbf1) {
-        hbf2.setHarfBuzz(hbVersions[version]);
-        hbVersion2.value = version;
-      }
-      updateListByField();
-    });
+  hbf.setHarfBuzz(hb);
+  if (hbf === hbf1) {
+    hbf2.setHarfBuzz(hb);
+    const sel2 = document.getElementById('hbVersion2');
+    if (sel2) sel2.value = version;
   }
-  newScriptElement.onerror = function() {
-    window.alert(`Could not load HarfBuzz ${version}`);
-  }
-  newScriptElement.src = scriptSource;
-  document.head.appendChild(newScriptElement);
+  updateListByField();
 }
 
 function loadedHarfBuzzModule(module) {
@@ -650,18 +654,16 @@ async function hbVersionChange(event) {
 }
 
 function createHarfBuzzChoice(id, name, value) {
-  const hbVersionsAvailable = [
-    '12.3.0',
-    '12.2.0',
-    '12.0.0',
-    '11.5.0',
-    '11.4.5',
-    '11.3.3',
-    '11.0.1',
-  ];
-  let html = `<select name="${name}" id="${id}">\r\n`;
-  hbVersionsAvailable.forEach(v=>{
-    html += `<option value="${v}"${value===v?" selected":""}>${v}</option>\r\n`;
+  // Every HarfBuzz version the page can load; bundled ones come with the page, the others from the web
+  let list = (window.hbEngine?.HB_VERSIONS ?? []).map(v=>({hb: v.hb, bundled: v.bundled}));
+  if (list.length === 0) list = ['12.3.0','12.2.0','12.0.0','11.5.0','11.4.5','11.3.3','11.0.1'].map(hb=>({hb, bundled: true}));
+  if (value && !list.some(v=>v.hb === value)) list.unshift({hb: value, bundled: true});
+  let html = `<select name="${name}" id="${id}">
+`;
+  list.forEach(v=>{
+    const label = v.bundled ? v.hb : `${v.hb} (web)`;
+    html += `<option value="${v.hb}"${value===v.hb?" selected":""}>${label}</option>
+`;
   });
   html += '</select>';
   return html;
@@ -1330,7 +1332,7 @@ class hbFont {
   }
   shape(txt) {
     if (!this.fontBlob) return;
-    var buffer = this.hb.createBuffer();
+    var buffer = this.hb.createBuffer(this.hbFix);
     buffer.addText(txt);
     buffer.guessSegmentProperties();
     if ((typeof this.script === 'string') && (this.script.length > 0))
@@ -1339,6 +1341,8 @@ class hbFont {
       buffer.setLanguage(this.lang);
     if (!this.hbFix) {
       this.hb.shape(this.font, buffer, this.features);
+    } else if (this.hb.shapeTraced) {
+      this.hb.shapeTraced(this.font, buffer, this.features, () => true);
     } else {
       const exports = this.hb.hooks.exports;
       const addFunction = this.hb.hooks.addFunction;
@@ -1362,7 +1366,7 @@ class hbFont {
   }
   shapeWithTraceLimits(txt) {
     if (!this.fontBlob) return;
-    var buffer = this.hb.createBuffer();
+    var buffer = this.hb.createBuffer(true);
     buffer.addText(txt);
     buffer.guessSegmentProperties();
     if ((typeof this.script === 'string') && (this.script.length > 0))
@@ -3847,6 +3851,6 @@ showFontTwo(false);
 
 </script>
 
-</br>Tool Version: 2026-10-22 1100</p>
+</br>Tool Version: 2026-11-03 1655</p>
 </body>
 </html>
