@@ -42,6 +42,16 @@ The Diff column will help you quickly identify differences in the HarfBuzz outpu
 - If only the GIDs are different (because the font has auto assigned GIDs when building), this field will be blank.
 - Other differences are shown with icons.
 
+### HarfBuzz version
+
+Each font has its own **HarfBuzz version** drop-down in the footer of the word list (changing Font 1 also sets Font 2).
+Every version from 10.0.0 to 15.0.0 can be chosen, so the same fonts can be compared on different HarfBuzz releases:
+
+- Versions marked plain are bundled in `js/hbjs-<version>/` (11.0.1 to 12.3.0).
+- Versions marked *(web)* are loaded on first use from the jsDelivr CDN (harfbuzzjs 0.4.x, 0.10.x and 1.x), so they need an internet connection.
+
+`js/hb-engine.mjs` loads the engines. harfbuzzjs 1.x (HarfBuzz 14.2.0 and later) has a different API and no raw WASM access; it is wrapped to look like the others, glyph outlines are drawn by the bundled engine, and tracing goes through the buffer message callback.
+
 ### Check Similar
 The "Check Similar" button will iterate through all words in the list,
 and check entries that are identical, or only have GID differences.

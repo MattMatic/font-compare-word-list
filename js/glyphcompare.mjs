@@ -259,6 +259,9 @@ export class GlyphCompareClass {
   constructor(hb) {
     this.glyphs = {};
     this.hbFix = false;
+    // Outlines are drawn through raw WASM calls that harfbuzzjs 1.x builds do not offer. For those
+    // engines the outlines are drawn by a bundled engine (window.hbDrawEngine) instead.
+    this.drawHb = (typeof window !== 'undefined') ? window.hbDrawEngine : null;
     this.setHarfBuzz(hb);
   }
   setHarfBuzz(hb) {
@@ -278,6 +281,9 @@ export class GlyphCompareClass {
     if (this.font) { this.font.destroy(); delete(this.font); }
     if (this.face) { this.face.destroy(); delete(this.face); }
     if (this.blob) { this.blob.destroy(); delete(this.blob); }
+    if (this.drawFont) { this.drawFont.destroy(); delete(this.drawFont); }
+    if (this.drawFace) { this.drawFace.destroy(); delete(this.drawFace); }
+    if (this.drawBlob) { this.drawBlob.destroy(); delete(this.drawBlob); }
     //this.glyphs = {};
     this.freeGlyphCache();
   }
@@ -316,6 +322,11 @@ export class GlyphCompareClass {
     this.blob = this.hb.createBlob(this.fontBlob);
     this.face = this.hb.createFace(this.blob, 0);
     this.font = this.hb.createFont(this.face);
+    if (!this.hb.hooks && this.drawHb) {
+      this.drawBlob = this.drawHb.createBlob(this.fontBlob);
+      this.drawFace = this.drawHb.createFace(this.drawBlob, 0);
+      this.drawFont = this.drawHb.createFont(this.drawFace);
+    }
   }
   //----------------------------------------------------------------------
   // Converts the glyph drawing to an array of point arrays compatible with Clipper2
@@ -324,9 +335,11 @@ export class GlyphCompareClass {
   // NOTE: Cubic Bezier curve flattening not tested yet!!
   glyphToPolyline(glyphId) {
     if (!this.glyphs[glyphId]) {
-      var ptr = this.font.ptr;
-      const exports = this.hb.hooks.exports;
-      const addFunction = this.hb.hooks.addFunction;
+      const ownDraw = !!this.hb.hooks;
+      const drawEngine = ownDraw ? this.hb : this.drawHb;
+      var ptr = (ownDraw ? this.font : this.drawFont).ptr;
+      const exports = drawEngine.hooks.exports;
+      const addFunction = drawEngine.hooks.addFunction;
       /*
       var lastXY = {};
       var firstXY = {};
@@ -416,7 +429,7 @@ export class GlyphCompareClass {
     return this.glyphs[glyphId];
   }
   shape(txt, features) {
-    let buffer = this.hb.createBuffer();
+    let buffer = this.hb.createBuffer(this.hbFix);
     buffer.addText(txt);
     buffer.guessSegmentProperties();
     if ((typeof this.script === 'string') && (this.script.length > 0)) {
@@ -428,6 +441,8 @@ export class GlyphCompareClass {
 
     if (!this.hbFix) {
       this.hb.shape(this.font, buffer, features, 0);
+    } else if (this.hb.shapeTraced) {
+      this.hb.shapeTraced(this.font, buffer, features, () => true);
     } else {
       //Workaround for pre HarfBuzz 12.2.0 with Indic shaping
       const exports = this.hb.hooks.exports;
